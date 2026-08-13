@@ -16,6 +16,10 @@ export async function convertAudioToSpectrumVideo(
     (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioCtx = new AudioCtxClass();
 
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
+
   let decodedBuffer: AudioBuffer;
   try {
     decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -79,13 +83,14 @@ export async function convertAudioToSpectrumVideo(
   };
 
   return new Promise((resolve, reject) => {
-    let animationFrameId: number;
+    let renderTimer: ReturnType<typeof setInterval> | undefined;
     const style = options.spectrumStyle || 'bars';
     const theme = options.spectrumTheme || 'indigo-violet';
     const trackName = file.name.replace(/\.[^/.]+$/, '');
 
     mediaRecorder.onstop = () => {
-      cancelAnimationFrame(animationFrameId);
+      if (renderTimer) clearInterval(renderTimer);
+      clearTimeout(safetyTimer);
       audioCtx.close();
       const finalBlob = new Blob(recordedChunks, { type: mimeType });
       onProgress?.(100);
@@ -98,7 +103,8 @@ export async function convertAudioToSpectrumVideo(
     };
 
     mediaRecorder.onerror = (e) => {
-      cancelAnimationFrame(animationFrameId);
+      if (renderTimer) clearInterval(renderTimer);
+      clearTimeout(safetyTimer);
       audioCtx.close();
       reject(new Error(`Media recording failed: ${(e as ErrorEvent).message || 'Unknown error'}`));
     };
@@ -124,16 +130,35 @@ export async function convertAudioToSpectrumVideo(
 
     mediaRecorder.start();
     source.start(0);
-    const startTime = audioCtx.currentTime;
+    // Wall-clock timeline: AudioContext.currentTime can drift from wall clock
+    // (and stalls entirely when suspended), so drive timing off performance.now().
+    const startWall = performance.now();
 
-    // Render Frame Loop
+    let stopped = false;
+    const stopRecording = () => {
+      if (stopped) return;
+      stopped = true;
+      if (renderTimer) clearInterval(renderTimer);
+      mediaRecorder.stop();
+    };
+
+    source.onended = stopRecording;
+
+    // Safety net: if onended never fires (e.g. suspended context edge cases),
+    // force stop shortly after the audio would have finished.
+    const safetyTimer = window.setTimeout(stopRecording, duration * 1000 + 2000);
+
+    // Render Frame Loop — fixed 30fps timer (matches canvas.captureStream(30)).
+    // requestAnimationFrame throttles to ~1fps when the tab is unfocused, which
+    // produced near-static videos; a timer keeps frames flowing while recording.
+    const FRAME_MS = 1000 / 30;
     const draw = () => {
-      const elapsed = audioCtx.currentTime - startTime;
-      const progressPct = Math.min(99, Math.round((elapsed / duration) * 100));
+      const elapsedMs = performance.now() - startWall;
+      const progressPct = Math.min(99, Math.round((elapsedMs / 1000 / duration) * 100));
       onProgress?.(Math.max(45, progressPct));
 
-      if (elapsed >= duration) {
-        mediaRecorder.stop();
+      if (elapsedMs / 1000 >= duration) {
+        stopRecording();
         return;
       }
 
@@ -165,7 +190,7 @@ export async function convertAudioToSpectrumVideo(
       // 2. Draw Center Header / Track Metadata
       ctx.save();
       ctx.textAlign = 'center';
-      
+
       // Track Title
       ctx.font = 'bold 36px sans-serif';
       ctx.fillStyle = '#ffffff';
@@ -273,12 +298,13 @@ export async function convertAudioToSpectrumVideo(
         const s = Math.floor(sec % 60);
         return `${m}:${s.toString().padStart(2, '0')}`;
       };
+      const elapsedSec = elapsedMs / 1000;
 
       ctx.save();
       ctx.font = '600 16px monospace';
       ctx.fillStyle = '#cbd5e1';
       ctx.textAlign = 'center';
-      ctx.fillText(`${formatTime(elapsed)} / ${formatTime(duration)}`, canvas.width / 2, canvas.height - 85);
+      ctx.fillText(`${formatTime(elapsedSec)} / ${formatTime(duration)}`, canvas.width / 2, canvas.height - 85);
 
       // Progress Track
       const trackW = 600;
@@ -291,7 +317,7 @@ export async function convertAudioToSpectrumVideo(
       ctx.fill();
 
       // Progress Fill
-      const fillW = (elapsed / duration) * trackW;
+      const fillW = (elapsedSec / duration) * trackW;
       ctx.fillStyle = gradientColors[0];
       ctx.shadowColor = primaryGlow;
       ctx.shadowBlur = 10;
@@ -299,10 +325,8 @@ export async function convertAudioToSpectrumVideo(
       ctx.roundRect(trackX, trackY, fillW, 8, 4);
       ctx.fill();
       ctx.restore();
-
-      animationFrameId = requestAnimationFrame(draw);
     };
 
-    draw();
+    renderTimer = setInterval(draw, FRAME_MS);
   });
 }
