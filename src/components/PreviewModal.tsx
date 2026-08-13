@@ -179,7 +179,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                         <Music className="w-4 h-4 text-indigo-400" />
                         <span>Converted Audio Output ({item.targetFormat.toUpperCase()})</span>
                       </div>
-                      <audio controls src={convertedUrl} className="w-full h-10 rounded-xl" />
+                      {item.options.audio?.spectrumVisualizer ? (
+                        <video controls src={convertedUrl} className="w-full rounded-xl" />
+                      ) : (
+                        <audio controls src={convertedUrl} className="w-full h-10 rounded-xl" />
+                      )}
                     </div>
                   )}
                 </div>
