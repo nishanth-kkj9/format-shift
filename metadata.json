@@ -1,0 +1,6 @@
+{
+  "name": "FormatShift - Universal File Converter",
+  "description": "Universal web file format converter supporting images, audio, video, documents, and code data formats with batch options, live previews, and quality settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
