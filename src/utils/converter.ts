@@ -338,22 +338,33 @@ export async function convertAudio(
   file: File,
   targetFormat: TargetFormat,
   options: AudioConversionOptions,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  abortSignal?: AbortSignal
 ): Promise<{ blob: Blob; duration: number }> {
-  // If target format is a video format (MP4, WEBM, GIF) or user explicitly enabled spectrum visualizer
-  if (
-    targetFormat === 'mp4' ||
-    targetFormat === 'webm' ||
-    targetFormat === 'gif' ||
-    options.spectrumVisualizer
-  ) {
-    const result = await convertAudioToSpectrumVideo(file, targetFormat, options, onProgress);
-    return { blob: result.blob, duration: result.duration };
+      // If target format is a video format (MP4, WEBM, GIF) or user explicitly enabled spectrum visualizer
+      if (
+        targetFormat === 'mp4' ||
+        targetFormat === 'webm' ||
+        targetFormat === 'gif' ||
+        options.spectrumVisualizer
+      ) {
+        const result = await convertAudioToSpectrumVideo(file, targetFormat, options, onProgress, abortSignal);
+        return { blob: result.blob, duration: result.duration };
+      }
+
+  // Check for abort before starting
+  if (abortSignal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
   }
 
   onProgress?.(15);
   const arrayBuffer = await file.arrayBuffer();
   onProgress?.(40);
+
+  // Check for abort after reading file
+  if (abortSignal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
 
   const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioCtx = new AudioCtxClass();
@@ -363,6 +374,12 @@ export async function convertAudio(
     decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
   } catch {
     throw new Error('Could not decode audio data from file');
+  }
+
+  // Check for abort after decoding
+  if (abortSignal?.aborted) {
+    audioCtx.close();
+    throw new DOMException('Aborted', 'AbortError');
   }
 
   onProgress?.(60);
@@ -396,6 +413,12 @@ export async function convertAudio(
 
   onProgress?.(80);
   const renderedBuffer = await offlineCtx.startRendering();
+
+  // Check for abort after rendering
+  if (abortSignal?.aborted) {
+    audioCtx.close();
+    throw new DOMException('Aborted', 'AbortError');
+  }
 
   // Export to WAV PCM
   const wavBlob = audioBufferToWavBlob(renderedBuffer);

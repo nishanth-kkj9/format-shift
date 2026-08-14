@@ -4,7 +4,8 @@ export async function convertAudioToSpectrumVideo(
   file: File,
   targetFormat: TargetFormat,
   options: AudioConversionOptions,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  abortSignal?: AbortSignal
 ): Promise<{ blob: Blob; mimeType: string; dimensions: { width: number; height: number }; duration: number }> {
   onProgress?.(10);
 
@@ -20,11 +21,21 @@ export async function convertAudioToSpectrumVideo(
     await audioCtx.resume();
   }
 
+  // Check for abort before decoding
+  if (abortSignal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
   let decodedBuffer: AudioBuffer;
   try {
     decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
   } catch {
     throw new Error('Failed to decode audio data for spectrum visualizer');
+  }
+
+  // Check for abort after decoding
+  if (abortSignal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
   }
 
   const duration = decodedBuffer.duration;
@@ -83,6 +94,11 @@ export async function convertAudioToSpectrumVideo(
   };
 
   return new Promise((resolve, reject) => {
+    // Check for abort before starting
+    if (abortSignal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
     let renderTimer: ReturnType<typeof setInterval> | undefined;
     const style = options.spectrumStyle || 'bars';
     const theme = options.spectrumTheme || 'indigo-violet';
@@ -136,6 +152,16 @@ export async function convertAudioToSpectrumVideo(
 
     let stopped = false;
     const stopRecording = () => {
+      // Check for abort before stopping
+      if (abortSignal?.aborted) {
+        // Clean up and reject with abort error
+        if (renderTimer) clearInterval(renderTimer);
+        clearTimeout(safetyTimer);
+        audioCtx.close();
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+      
       if (stopped) return;
       stopped = true;
       if (renderTimer) clearInterval(renderTimer);
@@ -146,13 +172,28 @@ export async function convertAudioToSpectrumVideo(
 
     // Safety net: if onended never fires (e.g. suspended context edge cases),
     // force stop shortly after the audio would have finished.
-    const safetyTimer = window.setTimeout(stopRecording, duration * 1000 + 2000);
+    const safetyTimer = window.setTimeout(() => {
+      // Check for abort in safety timer callback
+      if (abortSignal?.aborted) {
+        if (renderTimer) clearInterval(renderTimer);
+        audioCtx.close();
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+      stopRecording();
+    }, duration * 1000 + 2000);
 
     // Render Frame Loop — fixed 30fps timer (matches canvas.captureStream(30)).
     // requestAnimationFrame throttles to ~1fps when the tab is unfocused, which
     // produced near-static videos; a timer keeps frames flowing while recording.
     const FRAME_MS = 1000 / 30;
     const draw = () => {
+      // Check for abort in draw loop
+      if (abortSignal?.aborted) {
+        stopRecording();
+        return;
+      }
+      
       const elapsedMs = performance.now() - startWall;
       const progressPct = Math.min(99, Math.round((elapsedMs / 1000 / duration) * 100));
       onProgress?.(Math.max(45, progressPct));

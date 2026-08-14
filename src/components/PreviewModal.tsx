@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Eye, Download, ArrowRight, Music, Film, FileCode } from 'lucide-react';
 import { ConversionItem } from '../types';
@@ -23,6 +23,19 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
   const originalUrl = item.previewUrl || URL.createObjectURL(item.file);
   const convertedUrl = item.convertedUrl || '';
+
+  // Clean up object URLs when component unmounts or item changes
+  useEffect(() => {
+    return () => {
+      // Revoke object URLs to prevent memory leaks
+      if (item?.previewUrl === undefined && item?.file) {
+        URL.revokeObjectURL(originalUrl);
+      }
+      if (item?.convertedUrl) {
+        URL.revokeObjectURL(convertedUrl);
+      }
+    };
+  }, [item, originalUrl, convertedUrl]);
 
   const sizeDiff = item.convertedSize ? item.convertedSize - item.originalSize : 0;
   const pctSaved = item.convertedSize

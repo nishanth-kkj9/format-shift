@@ -177,21 +177,38 @@ export default function App() {
     const item = queue.find((q) => q.id === id);
     if (!item) return;
 
+    // Create abort controller for this conversion
+    const abortController = new AbortController();
+
     // Update state to converting
     setQueue((prev) =>
       prev.map((q) => (q.id === id ? { ...q, status: 'converting', progress: 5 } : q))
     );
 
-    try {
-      let resultBlob: Blob;
-      let dimensions: { width: number; height: number } | undefined;
-      let duration: number | undefined;
+    let resultBlob: Blob;
+    let dimensions: { width: number; height: number } | undefined;
+    let duration: number | undefined;
 
-      const updateProgress = (pct: number) => {
-        setQueue((prev) =>
-          prev.map((q) => (q.id === id ? { ...q, progress: pct } : q))
-        );
-      };
+    const updateProgress = (pct: number) => {
+      setQueue((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, progress: pct } : q))
+      );
+    };
+
+    // Listen for abort signal to update status if conversion is cancelled
+    const handleAbort = () => {
+      setQueue((prev) =>
+        prev.map((q) =>
+          q.id === id
+            ? { ...q, status: 'error', errorMessage: 'Conversion cancelled', progress: 0 }
+            : q
+        )
+      );
+    };
+
+    abortController.signal.addEventListener('abort', handleAbort);
+
+    try {
 
       // Spectrum visualizer always produces a video, regardless of the queued target.
       const effectiveTarget: TargetFormat =
@@ -214,7 +231,7 @@ export default function App() {
         resultBlob = res.blob;
         dimensions = res.dimensions;
       } else if (item.category === 'audio') {
-        const res = await convertAudio(item.file, effectiveTarget, item.options.audio!, updateProgress);
+        const res = await convertAudio(item.file, effectiveTarget, item.options.audio!, updateProgress, abortController.signal);
         resultBlob = res.blob;
         duration = res.duration;
       } else if (item.category === 'video') {
@@ -276,12 +293,21 @@ export default function App() {
       setHistory((prev) => [historyEntry, ...prev]);
 
     } catch (err: unknown) {
+      // Ignore abort errors as they're handled separately
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Already handled by the abort event listener
+        return;
+      }
+      
       const errorMsg = err instanceof Error ? err.message : 'Conversion failed';
       setQueue((prev) =>
         prev.map((q) =>
           q.id === id ? { ...q, status: 'error', errorMessage: errorMsg, progress: 0 } : q
         )
       );
+    } finally {
+      // Clean up abort controller event listener
+      abortController.signal.removeEventListener('abort', handleAbort);
     }
   };
 
