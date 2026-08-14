@@ -2,65 +2,500 @@
 
 # FormatShift
 
-Universal High-Performance Media & Data Engine
+### Universal File Conversion for Images, Audio, Video, Documents & Data
 
-Instant conversion for images, audio, video, documents, and data files — client-side in the browser, with a server-side ffmpeg fallback for formats the browser can't handle.
+A browser-first conversion app built with React and TypeScript. FormatShift converts common files locally in the browser when possible and uses a server-side `ffmpeg` pipeline for formats that require native codecs or seekable media output.
+
+**Private by default for browser conversions · Batch processing · Live previews · Conversion history · ZIP downloads**
 
 </div>
 
-## Features
+---
 
-- **Batch conversion** — convert multiple files at once, apply a global target format
-- **In-browser conversion** — HTML5 Canvas, Web Audio API, and Web Media Encoders for common formats (PNG, JPG, WEBP, GIF, WAV, MP3, JSON, CSV, and more). Zero upload, private by default.
-- **Server-side fallback** — ffmpeg-powered conversion for AVIF, ICO, BMP, FLAC, OGG, M4A, MP4, MOV, MKV, AVI, and video-to-audio extraction
-- **Options per file** — quality, social-media presets, EXIF removal, resize, rotate, grayscale
-- **Live previews** — preview converted images, audio, and video before download
-- **Code snippets** — ready-to-run Python, Node.js, and HTML5 conversion code
-- **History** — conversion history drawer with re-download
-- **Save all as ZIP** — batch-download every converted file
-- **Memory-safe previews** — object URLs created once per file and revoked on unmount to avoid leaks
+## What is FormatShift?
 
-## Tech Stack
+FormatShift is a full-stack file conversion application designed around a **hybrid conversion architecture**:
 
-- **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS 4
-- **Backend:** Express, tsx, ffmpeg-static, multer, JSZip
-- **Conversion:** browser-native codecs + server ffmpeg
+1. A user drops one or more files into the browser.
+2. FormatShift detects the file category and source format automatically.
+3. Conversions that the browser can reliably perform stay **client-side** using Canvas, Web Audio, and browser APIs.
+4. Formats that need `ffmpeg` are sent to the local/server API and processed with `ffmpeg-static`.
+5. The converted result is returned to the browser for preview and download.
 
-## Getting Started
+This approach reduces unnecessary uploads while still supporting media formats that browser APIs cannot reliably encode.
 
-**Prerequisites:** Node.js 20+ and [ffmpeg](https://ffmpeg.org/download.html) (or let ffmpeg-static bundle it).
+> **Privacy note:** browser-side conversions do not need to upload the source file. Server-side conversions necessarily send the selected file to the FormatShift API for processing. On the bundled server, uploaded files are written to a temporary directory and cleaned up after the request.
+
+---
+
+## ✨ Features
+
+### Conversion
+
+- **Batch conversion** — queue multiple files and convert them together.
+- **Automatic format detection** — identifies image, audio, video, data, and document categories from the file type/extension.
+- **Per-file target format** — each queued file can have its own output format.
+- **Global target format** — apply one compatible target format to multiple queued files.
+- **Browser-first processing** — common conversions run locally without an API upload.
+- **FFmpeg fallback** — server-side processing for formats that need native codecs.
+- **Video → audio extraction** — extract MP3/WAV and other supported audio formats from video.
+- **Audio spectrum video** — create audio visualizer videos from audio files.
+
+### Image tools
+
+- PNG, JPG/JPEG, WEBP, GIF, BMP, ICO, SVG and AVIF targets in the UI.
+- Quality control.
+- Maximum width/height resizing.
+- Aspect-ratio preservation.
+- Rotation and horizontal/vertical flipping.
+- Grayscale conversion.
+- Background color handling.
+- Social-media presets.
+- Favicon preset at 32×32.
+
+### Audio tools
+
+- MP3, WAV, OGG, AAC, M4A and FLAC targets.
+- Bitrate selection.
+- Sample-rate selection.
+- Mono/stereo selection.
+- Volume adjustment.
+- Start/end trimming.
+- Audio spectrum visualizer with multiple visual styles/themes.
+
+### Video tools
+
+- MP4, WEBM, GIF, MOV, MKV and AVI targets.
+- 360p, 480p, 720p and 1080p presets.
+- FPS selection.
+- Video-to-audio extraction.
+- Audio spectrum video generation from audio input.
+
+### Data & document tools
+
+- JSON, CSV, TSV, XML and YAML conversions.
+- JSON ↔ CSV/TSV/XML/YAML transformations.
+- CSV/TSV parsing with quoted-field handling.
+- Markdown/text → HTML conversion.
+- Text/Markdown/HTML/PDF document targets are exposed by the application.
+
+> **Current implementation note:** data/document conversion is primarily text-based and browser-side. The current implementation does not provide a full PDF rendering engine; a `.pdf` target is currently represented as text content with a PDF MIME type rather than a production-grade PDF layout generator. Treat PDF conversion as an area for future improvement.
+
+### UX
+
+- Drag-and-drop upload queue.
+- Per-file conversion progress.
+- Live image/audio/video previews.
+- Conversion options modal.
+- Conversion history persisted in `localStorage`.
+- Re-download from history.
+- Batch ZIP download.
+- Code snippets for Python, Node.js and browser JavaScript.
+- Dark/light theme support.
+- Lazy-loaded heavy modal components to reduce the initial frontend bundle.
+- Object URL cleanup to reduce preview memory leaks.
+
+---
+
+## 🏗️ Architecture
+
+```text
+┌─────────────────────────────── Browser ───────────────────────────────┐
+│                                                                       │
+│  Dropzone → File Detection → Conversion Queue → Options / Preview     │
+│                                  │                                    │
+│                    ┌─────────────┴─────────────┐                      │
+│                    │                           │                      │
+│             Browser Conversion           Server Conversion           │
+│             Canvas / Web Audio             HTTP multipart             │
+│             Media APIs                    /api/convert                │
+│                    │                           │                      │
+│                    │                     Busboy streaming             │
+│                    │                           │                      │
+│                    │                         ffmpeg                    │
+│                    │                           │                      │
+│                    └──────────────┬────────────┘                      │
+│                                   │                                   │
+│                          Converted Blob/File                          │
+│                                   │                                   │
+│                        Preview → History → Download                   │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Client-side path
+
+The frontend contains category-specific conversion modules:
+
+- `convertImage.ts` — HTML5 Canvas image processing.
+- `convertAudio.ts` — Web Audio API decoding, trimming, gain, resampling and WAV encoding.
+- `convertVideo.ts` — browser video/canvas processing where supported.
+- `convertData.ts` — JSON/CSV/TSV/XML/YAML/text transformations.
+- `audioVisualizer.ts` — spectrum visualization/video generation.
+
+### Server-side path
+
+The Express API handles conversions requiring FFmpeg:
+
+- `server/upload.ts` streams multipart files to temporary storage instead of buffering the complete upload in memory.
+- `server/convert.ts` invokes `ffmpeg-static` and applies codec/filter settings.
+- `server/routes/convert.ts` exposes the conversion endpoint and cleans temporary files after processing.
+- `server/routes/templates.ts` generates conversion code examples.
+
+The upload layer also performs category-specific size checks and best-effort magic-byte MIME validation before conversion.
+
+---
+
+## 📦 Supported Formats
+
+| Category | Formats / Targets | Main processing path |
+|---|---|---|
+| **Image** | PNG, JPG, JPEG, WEBP, GIF, BMP, ICO, SVG, AVIF | Browser + FFmpeg fallback |
+| **Audio** | MP3, WAV, OGG, AAC, M4A, FLAC | Browser WAV + FFmpeg for compressed targets |
+| **Video** | MP4, WEBM, GIF, MOV, MKV, AVI | Browser where supported + FFmpeg |
+| **Data** | JSON, CSV, TSV, XML, YAML | Browser |
+| **Document** | PDF, TXT, Markdown, HTML | Browser/text pipeline |
+
+### Server upload limits
+
+Server-side uploads are limited by category:
+
+| Category | Maximum upload size |
+|---|---:|
+| Image | 50 MB |
+| Audio | 100 MB |
+| Video | 200 MB |
+| Document | 10 MB |
+| Data | 10 MB |
+
+The multipart parser also has an overall 200 MB Busboy file-size limit.
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+- React 19
+- TypeScript 5.8
+- Vite 6
+- Tailwind CSS 4
+- Motion
+- Lucide React
+- Canvas / Web Audio / browser media APIs
+
+### Backend
+
+- Node.js 20+
+- Express 4
+- TypeScript
+- `tsx`
+- `ffmpeg-static`
+- Busboy
+- `file-type`
+- `express-rate-limit`
+
+### Utilities / Build
+
+- esbuild
+- Vitest
+- JSZip
+- Concurrently
+- Docker support
+- GitHub Actions CI
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js 20 or newer**
+- npm
+- A modern browser with Canvas/Web Audio/media API support
+
+The application uses `ffmpeg-static` for server-side conversion, so a separate system FFmpeg installation is normally **not required**.
+
+### Install
 
 ```bash
+git clone https://github.com/nishanth-kkj9/format-shift.git
+cd format-shift
 npm install
+```
+
+### Development
+
+Run frontend and API together:
+
+```bash
 npm run dev:all
 ```
 
-- Frontend: http://localhost:5173
-- API: http://localhost:4000 (`/api/health`, `/api/convert`)
+Or run them separately:
 
-## Scripts
+```bash
+npm run dev
+```
 
-| Command          | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| `npm run dev:all`| Run API server + Vite dev server together          |
-| `npm run dev`    | Vite dev server only                               |
-| `npm run server` | Express API server only (`tsx server.ts`)          |
-| `npm run build`  | Build frontend + bundle API into `dist/`           |
-| `npm start`      | Serve the production build (`dist/server.cjs`)     |
-| `npm run lint`   | Typecheck (`tsc --noEmit`)                         |
+```bash
+npm run server
+```
 
-## API
+Default development endpoints:
 
-### `POST /api/convert`
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:4000`
+- Health check: `http://localhost:4000/api/health`
 
-Multipart form: `file`, `category`, `sourceFormat`, `targetFormat`, `options` (JSON string).
+### Environment
 
-Returns the converted file. Unsupported targets return `400`.
+The repository includes `.env.example` for environment configuration. Copy it to `.env` when environment variables are required by your deployment.
 
-### `GET /api/code-template?category=...&target=...`
+---
 
-Returns a code snippet (Python/Node.js/HTML) for converting the given format pair.
+## 📜 NPM Scripts
 
-## Deployment
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start the Vite development server |
+| `npm run server` | Start the Express API with `tsx` |
+| `npm run dev:all` | Start Vite and Express together |
+| `npm run build` | Build the frontend and bundle the API into `dist/server.cjs` |
+| `npm start` | Start the production server |
+| `npm run preview` | Preview the Vite production build |
+| `npm run lint` | TypeScript type-check with `tsc --noEmit` |
+| `npm test` | Run the Vitest test suite |
+| `npm run clean` | Remove generated build output |
 
-`npm run build` produces `dist/` containing the static frontend and a single bundled `server.cjs`. Serve with `npm start`, or deploy `dist/` to any Node/Cloud Run/static+server platform.
+---
+
+## 🔌 API
+
+### Health check
+
+```http
+GET /api/health
+```
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "app": "FormatShift Universal Converter",
+  "timestamp": "2026-08-14T00:00:00.000Z"
+}
+```
+
+### Convert a file
+
+```http
+POST /api/convert
+Content-Type: multipart/form-data
+```
+
+Multipart fields:
+
+| Field | Required | Description |
+|---|---|---|
+| `file` | Yes | Source file |
+| `category` | Yes | `image`, `audio`, `video`, `document`, or `data` |
+| `sourceFormat` | Optional | Source extension/format |
+| `targetFormat` | Yes | Requested output format |
+| `options` | Optional | JSON-encoded conversion options |
+
+Successful responses return the converted binary with an appropriate `Content-Type` and an attachment filename.
+
+Common client errors return JSON such as:
+
+```json
+{
+  "error": "Unsupported target format: xyz"
+}
+```
+
+The conversion endpoint is rate-limited to **30 requests per minute per IP** by default.
+
+### Code templates
+
+```http
+POST /api/code-template
+Content-Type: application/json
+```
+
+Example request:
+
+```json
+{
+  "category": "image",
+  "sourceFormat": "png",
+  "targetFormat": "webp"
+}
+```
+
+The response contains generated examples for:
+
+- Python
+- Node.js
+- HTML/JavaScript
+
+---
+
+## 🧪 Testing & CI
+
+FormatShift includes unit and integration tests using Vitest.
+
+The integration suite covers important server behavior including:
+
+- Successful streamed PNG conversion.
+- Rejection of binary content whose magic bytes do not match the requested category.
+- Invalid image data handling.
+- Per-category upload size limits.
+- Temporary-file cleanup after conversion.
+
+Run locally:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+GitHub Actions runs the same type-check, test, and build pipeline on pushes to `main` and pull requests.
+
+---
+
+## 🐳 Docker
+
+A multi-stage Dockerfile is included.
+
+Build:
+
+```bash
+docker build -t formatshift .
+```
+
+Run:
+
+```bash
+docker run --rm -p 4000:4000 formatshift
+```
+
+Then open:
+
+```text
+http://localhost:4000
+```
+
+The production image uses Node 20 Alpine and installs runtime dependencies separately from development dependencies.
+
+---
+
+## 📁 Project Structure
+
+```text
+format-shift/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── server/
+│   ├── convert.ts
+│   ├── convert.test.ts
+│   ├── integration.test.ts
+│   ├── upload.ts
+│   └── routes/
+│       ├── convert.ts
+│       └── templates.ts
+├── src/
+│   ├── components/
+│   │   ├── BatchBar.tsx
+│   │   ├── CodeSnippetModal.tsx
+│   │   ├── ConversionOptionsModal.tsx
+│   │   ├── Dropzone.tsx
+│   │   ├── FileList.tsx
+│   │   ├── FormatDropdown.tsx
+│   │   ├── FormatGuide.tsx
+│   │   ├── Header.tsx
+│   │   ├── HistoryDrawer.tsx
+│   │   └── PreviewModal.tsx
+│   ├── utils/
+│   │   ├── audioVisualizer.ts
+│   │   ├── convertAudio.ts
+│   │   ├── convertData.ts
+│   │   ├── convertImage.ts
+│   │   ├── convertVideo.ts
+│   │   ├── serverConvert.ts
+│   │   ├── detect.ts
+│   │   ├── metadata.ts
+│   │   └── converter.ts
+│   ├── App.tsx
+│   ├── index.css
+│   ├── main.tsx
+│   └── types.ts
+├── Dockerfile
+├── index.html
+├── package.json
+├── server.ts
+├── tsconfig.json
+└── vite.config.ts
+```
+
+---
+
+## 🔐 Security & Resource Handling
+
+The server includes several safeguards for file-processing workloads:
+
+- Multipart uploads are streamed to temporary files rather than fully buffered in RAM.
+- Per-category file-size limits are enforced.
+- File signatures are checked with `file-type` when a binary signature is available.
+- The conversion API is rate-limited.
+- Temporary upload and FFmpeg output directories are cleaned up after processing.
+- Browser object URLs are revoked during application cleanup to reduce memory retention.
+
+### Important production considerations
+
+FormatShift is a file-processing application, so a public deployment should still be hardened for its expected traffic and threat model. Consider adding authentication or quotas, stronger request timeouts, reverse-proxy limits, structured logging, observability, stricter content validation, and isolated conversion workers before exposing a high-volume instance to untrusted users.
+
+---
+
+## ⚠️ Current Limitations
+
+- Browser codec support varies by browser and operating system.
+- Some browser `canvas.toBlob()` formats can fall back to PNG when the requested encoder is unavailable.
+- Large client-side media conversions can consume significant browser memory.
+- Server-side FFmpeg conversions consume CPU and temporary disk space.
+- The current document pipeline is not a full office/PDF conversion engine.
+- PDF output is currently not a true layout-preserving PDF renderer.
+- Conversion options are category-specific and not every UI option applies to every output format.
+- Code templates are illustrative snippets, not a guarantee that every generated snippet supports every FormatShift option.
+
+---
+
+## 🗺️ Suggested Roadmap
+
+- [ ] Add a real PDF generation/rendering pipeline.
+- [ ] Add richer document conversions such as DOCX/ODT.
+- [ ] Improve CSV parsing for multiline quoted fields and more dialects.
+- [ ] Add stronger MIME/content validation for text formats.
+- [ ] Add conversion job IDs and asynchronous server workers for large files.
+- [ ] Add configurable server storage/cleanup policies.
+- [ ] Add more comprehensive end-to-end browser tests.
+- [ ] Add performance benchmarks for large media files.
+- [ ] Add authentication, quotas, and per-user limits for public deployments.
+- [ ] Add downloadable conversion reports/metadata.
+
+---
+
+## 📄 License
+
+No license file is currently included in the repository. If you plan to distribute or accept external contributions, add an explicit open-source license before treating the project as licensed for reuse.
+
+---
+
+## 👤 Author
+
+Built by **Nishanth Kkj9**.
+
+Repository: https://github.com/nishanth-kkj9/format-shift
