@@ -6,5 +6,6 @@ coverage/
 *.log
 *.err
 graphify-out/
+plans/
 .env*
 !.env.example
