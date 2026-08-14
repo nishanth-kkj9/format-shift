@@ -223,7 +223,8 @@ export default function App() {
           item.category,
           item.originalExtension,
           effectiveTarget,
-          item.options
+          item.options,
+          abortController.signal
         );
         updateProgress(100);
       } else if (item.category === 'image') {
@@ -235,7 +236,7 @@ export default function App() {
         resultBlob = res.blob;
         duration = res.duration;
       } else if (item.category === 'video') {
-        const res = await convertVideo(item.file, item.targetFormat, item.options.video!, updateProgress);
+        const res = await convertVideo(item.file, item.targetFormat, item.options.video!, updateProgress, abortController.signal);
         resultBlob = res.blob;
         dimensions = res.dimensions;
         duration = res.duration;
@@ -366,12 +367,27 @@ export default function App() {
 
   // Remove single item from queue
   const handleRemove = (id: string) => {
-    setQueue((prev) => prev.filter((item) => item.id !== id));
+    setQueue((prev) => {
+      const item = prev.find((i) => i.id === id);
+      if (item?.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      // Only revoke convertedUrl if it's not referenced in history
+      if (item?.convertedUrl && !history.some((h) => h.downloadUrl === item.convertedUrl)) {
+        URL.revokeObjectURL(item.convertedUrl);
+      }
+      return prev.filter((item) => item.id !== id);
+    });
   };
 
   // Clear All Queue
   const handleClearAll = () => {
-    setQueue([]);
+    setQueue((prev) => {
+      prev.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+      return [];
+    });
   };
 
   const filteredQueue = selectedCategory === 'all'

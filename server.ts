@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import { convertFile } from "./server/convert";
 
 const app = express();
@@ -10,8 +11,36 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB cap
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB cap for media
 });
+
+// Rate limit the conversion endpoint to prevent abuse
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+app.use("/api/convert", apiLimiter);
+
+// MIME type allowlist per category
+const ALLOWED_MIME: Record<string, string[]> = {
+  image: ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/x-icon", "image/svg+xml", "image/avif"],
+  audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/mp4", "audio/flac", "audio/x-wav"],
+  video: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska"],
+  document: ["application/pdf", "text/plain", "text/markdown", "text/html"],
+  data: ["application/json", "text/csv", "application/xml", "text/xml", "text/yaml", "text/tab-separated-values"],
+};
+
+// Per-category upload size limits
+const MAX_SIZES: Record<string, number> = {
+  image: 50 * 1024 * 1024,   // 50MB
+  audio: 100 * 1024 * 1024,  // 100MB
+  video: 200 * 1024 * 1024,  // 200MB
+  document: 10 * 1024 * 1024, // 10MB
+  data: 10 * 1024 * 1024,     // 10MB
+};
 
 // API endpoints
 app.get("/api/health", (req, res) => {
@@ -25,6 +54,19 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 
     const { category, sourceFormat, targetFormat } = req.body;
+    const cat = (category || "").toLowerCase();
+
+    // Validate file type against category (lenient: allow octet-stream through)
+    if (ALLOWED_MIME[cat] && file.mimetype !== "application/octet-stream" && !ALLOWED_MIME[cat].includes(file.mimetype)) {
+      return res.status(400).json({ error: `File type ${file.mimetype} not allowed for category ${cat}` });
+    }
+
+    // Enforce per-category size limits
+    const maxSize = MAX_SIZES[cat];
+    if (maxSize && file.size > maxSize) {
+      return res.status(413).json({ error: `File too large for ${cat} category (max ${maxSize / 1024 / 1024}MB)` });
+    }
+
     let options = {};
     try {
       options = JSON.parse(req.body.options || "{}");

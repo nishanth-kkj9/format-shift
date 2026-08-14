@@ -27,15 +27,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   // Clean up object URLs when component unmounts or item changes
   useEffect(() => {
     return () => {
-      // Revoke object URLs to prevent memory leaks
+      // Only revoke the URL we created ourselves (when previewUrl is undefined)
       if (item?.previewUrl === undefined && item?.file) {
         URL.revokeObjectURL(originalUrl);
       }
-      if (item?.convertedUrl) {
-        URL.revokeObjectURL(convertedUrl);
-      }
+      // Do NOT revoke convertedUrl — it's owned by App.tsx and used by history
     };
-  }, [item, originalUrl, convertedUrl]);
+  }, [item, originalUrl]);
 
   const sizeDiff = item.convertedSize ? item.convertedSize - item.originalSize : 0;
   const pctSaved = item.convertedSize

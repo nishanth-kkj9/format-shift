@@ -30,7 +30,11 @@ export async function extractFileMetadata(file: File): Promise<ExtractedMetadata
           metadata.dimensions = { width: img.naturalWidth, height: img.naturalHeight };
           resolve();
         };
-        img.onerror = () => resolve();
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          metadata.previewUrl = undefined;
+          resolve();
+        };
         img.src = url;
       });
     } else if (file.type.startsWith('video/') || ['mp4', 'webm', 'mov', 'avi', 'mkv', 'flv'].includes(ext)) {
@@ -45,7 +49,11 @@ export async function extractFileMetadata(file: File): Promise<ExtractedMetadata
           metadata.dimensions = { width: video.videoWidth, height: video.videoHeight };
           resolve();
         };
-        video.onerror = () => resolve();
+        video.onerror = () => {
+          URL.revokeObjectURL(url);
+          metadata.previewUrl = undefined;
+          resolve();
+        };
         video.src = url;
       });
     } else if (file.type.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'weba'].includes(ext)) {
@@ -59,7 +67,11 @@ export async function extractFileMetadata(file: File): Promise<ExtractedMetadata
           metadata.duration = audio.duration;
           resolve();
         };
-        audio.onerror = () => resolve();
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          metadata.previewUrl = undefined;
+          resolve();
+        };
         audio.src = url;
       });
     } else if (file.type.startsWith('text/') || ['json', 'csv', 'xml', 'yaml', 'yml', 'txt', 'md', 'tsv'].includes(ext)) {

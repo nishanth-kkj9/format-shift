@@ -22,16 +22,18 @@ export async function convertServerSide(
   category: string,
   sourceFormat: string,
   targetFormat: string,
-  options: ConversionOptions
+  options: ConversionOptions,
+  abortSignal?: AbortSignal
 ): Promise<Blob> {
   const form = new FormData();
   form.append('file', file);
   form.append('category', category);
   form.append('sourceFormat', sourceFormat);
   form.append('targetFormat', targetFormat);
-  form.append('options', JSON.stringify(options[category] || {}));
+  const categoryKey = category as keyof ConversionOptions;
+  form.append('options', JSON.stringify(options[categoryKey] || {}));
 
-  const res = await fetch('/api/convert', { method: 'POST', body: form });
+  const res = await fetch('/api/convert', { method: 'POST', body: form, signal: abortSignal });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.error || `Server conversion failed (${res.status})`);

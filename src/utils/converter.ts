@@ -506,7 +506,8 @@ export async function convertVideo(
   file: File,
   targetFormat: TargetFormat,
   options: VideoConversionOptions,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  abortSignal?: AbortSignal
 ): Promise<{ blob: Blob; dimensions?: { width: number; height: number }; duration?: number }> {
   onProgress?.(10);
 
@@ -527,6 +528,12 @@ export async function convertVideo(
 
     video.onloadedmetadata = () => {
       onProgress?.(30);
+      // Check for abort before starting
+      if (abortSignal?.aborted) {
+        URL.revokeObjectURL(videoUrl);
+        reject(new DOMException('Aborted', 'AbortError'));
+        return;
+      }
       let targetWidth = video.videoWidth;
       let targetHeight = video.videoHeight;
 
@@ -568,8 +575,18 @@ export async function convertVideo(
         if (e.data.size > 0) chunks.push(e.data);
       };
 
+      // Listen for abort to stop recording
+      const handleAbort = () => {
+        if (mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        URL.revokeObjectURL(videoUrl);
+      };
+      abortSignal?.addEventListener('abort', handleAbort, { once: true });
+
       mediaRecorder.onstop = () => {
         onProgress?.(100);
+        abortSignal?.removeEventListener('abort', handleAbort);
         URL.revokeObjectURL(videoUrl);
         const finalBlob = new Blob(chunks, { type: mimeType });
         resolve({
@@ -687,7 +704,44 @@ function isJson(str: string): boolean {
   }
 }
 
-function jsonToCsv(json: unknown, delimiter = ','): string {
+// Split a CSV line into fields, respecting double-quoted sections and escaped quotes ("").
+function parseCsvLine(line: string, delimiter: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        // Check for escaped quote ("" inside a quoted field)
+        if (line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === delimiter) {
+        fields.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+  }
+
+  fields.push(current.trim());
+  return fields;
+}
+
+export function jsonToCsv(json: unknown, delimiter = ','): string {
   const arr = Array.isArray(json) ? json : [json];
   if (arr.length === 0) return '';
 
@@ -701,7 +755,10 @@ function jsonToCsv(json: unknown, delimiter = ','): string {
         const val = record[header];
         if (val === null || val === undefined) return '';
         const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
-        return strVal.includes(delimiter) || strVal.includes('\n') ? `"${strVal.replace(/"/g, '""')}"` : strVal;
+        // Quote if contains delimiter, newline, or double quote
+        return strVal.includes(delimiter) || strVal.includes('\n') || strVal.includes('"')
+          ? `"${strVal.replace(/"/g, '""')}"`
+          : strVal;
       })
       .join(delimiter);
   });
@@ -709,16 +766,16 @@ function jsonToCsv(json: unknown, delimiter = ','): string {
   return [headerLine, ...rows].join('\n');
 }
 
-function csvToJson(csvText: string, delimiter = ','): Record<string, string>[] {
+export function csvToJson(csvText: string, delimiter = ','): Record<string, string>[] {
   const lines = csvText.trim().split('\n');
   if (lines.length === 0) return [];
 
-  const headers = lines[0].split(delimiter).map((h) => h.trim().replace(/^"|"$/g, ''));
+  const headers = parseCsvLine(lines[0], delimiter);
   const results: Record<string, string>[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
-    const values = lines[i].split(delimiter).map((v) => v.trim().replace(/^"|"$/g, ''));
+    const values = parseCsvLine(lines[i], delimiter);
     const obj: Record<string, string> = {};
     headers.forEach((h, index) => {
       obj[h] = values[index] || '';
@@ -729,7 +786,7 @@ function csvToJson(csvText: string, delimiter = ','): Record<string, string>[] {
   return results;
 }
 
-function jsonToXml(obj: unknown, rootName = 'root'): string {
+export function jsonToXml(obj: unknown, rootName = 'root'): string {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootName}>\n`;
 
   function buildXml(data: unknown, indent = '  ') {
@@ -760,7 +817,7 @@ function jsonToXml(obj: unknown, rootName = 'root'): string {
   return xml;
 }
 
-function jsonToYaml(obj: unknown, indent = 0): string {
+export function jsonToYaml(obj: unknown, indent = 0): string {
   let yaml = '';
   const spaces = ' '.repeat(indent);
 
@@ -787,7 +844,7 @@ function jsonToYaml(obj: unknown, indent = 0): string {
   return yaml;
 }
 
-function markdownToHtml(md: string): string {
+export function markdownToHtml(md: string): string {
   let html = md
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')

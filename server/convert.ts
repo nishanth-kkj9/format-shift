@@ -64,6 +64,17 @@ const MIME: Record<string, string> = {
 
 export const ACCEPTED_EXTENSIONS = Object.keys(MIME);
 
+// Best-effort cleanup of the temp directory created for seekable-output formats.
+function cleanupTempDir(tmpFile: string | null): void {
+  if (tmpFile) {
+    try {
+      rmSync(join(tmpFile, ".."), { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup; ignore errors
+    }
+  }
+}
+
 // pan:tail: avif/ico muxers need seekable output (header written after frames), so write those to a
 // temp file instead of streaming to stdout. Upgrade path: memory-cost-free, files are small.
 function runFFmpeg(args: string[], input: Buffer, seekableSuffix = ""): Promise<Buffer> {
@@ -78,21 +89,26 @@ function runFFmpeg(args: string[], input: Buffer, seekableSuffix = ""): Promise<
     const err: Buffer[] = [];
     proc.stdout.on("data", (c: Buffer) => out.push(c));
     proc.stderr.on("data", (c: Buffer) => err.push(c));
-    proc.on("error", (e) => reject(new Error(e.message)));
+    proc.on("error", (e) => {
+      cleanupTempDir(tmpFile);
+      reject(new Error(e.message));
+    });
     proc.on("close", (code) => {
       if (code === 0) {
         try {
           if (tmpFile) {
             const b = readFileSync(tmpFile);
-            rmSync(join(tmpFile, ".."), { recursive: true, force: true });
+            cleanupTempDir(tmpFile);
             resolve(b);
           } else {
             resolve(Buffer.concat(out));
           }
         } catch (e) {
+          cleanupTempDir(tmpFile);
           reject(new Error(e instanceof Error ? e.message : "output read failed"));
         }
       } else {
+        cleanupTempDir(tmpFile);
         const stderr = Buffer.concat(err).toString("utf8");
         const lastErr = stderr.split("\n").filter(Boolean).slice(-3).join("\n");
         reject(new Error(`ffmpeg failed (${code}): ${lastErr}`));
@@ -103,7 +119,7 @@ function runFFmpeg(args: string[], input: Buffer, seekableSuffix = ""): Promise<
   });
 }
 
-function imageFilters(opts: ConvertOptions): string[] {
+export function imageFilters(opts: ConvertOptions): string[] {
   const filters: string[] = [];
   const q = opts.quality ?? 90;
 
