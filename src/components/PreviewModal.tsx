@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Eye, Download, ArrowRight, Music, Film, FileCode } from 'lucide-react';
 import { ConversionItem } from '../types';
@@ -21,7 +21,10 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
   if (!item) return null;
 
-  const originalUrl = item.previewUrl || URL.createObjectURL(item.file);
+  const originalUrl = useMemo(
+    () => item.previewUrl || URL.createObjectURL(item.file),
+    [item.previewUrl, item.file]
+  );
   const convertedUrl = item.convertedUrl || '';
 
   // Clean up object URLs when component unmounts or item changes

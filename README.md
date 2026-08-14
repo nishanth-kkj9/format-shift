@@ -18,6 +18,7 @@ Instant conversion for images, audio, video, documents, and data files — clien
 - **Code snippets** — ready-to-run Python, Node.js, and HTML5 conversion code
 - **History** — conversion history drawer with re-download
 - **Save all as ZIP** — batch-download every converted file
+- **Memory-safe previews** — object URLs created once per file and revoked on unmount to avoid leaks
 
 ## Tech Stack
 
