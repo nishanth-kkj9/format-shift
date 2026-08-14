@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import confetti from 'canvas-confetti';
-import JSZip from 'jszip';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileCategory,
@@ -23,13 +22,15 @@ import { Header } from './components/Header';
 import { Dropzone } from './components/Dropzone';
 import { FileList } from './components/FileList';
 import { BatchBar } from './components/BatchBar';
-import { ConversionOptionsModal } from './components/ConversionOptionsModal';
-import { PreviewModal } from './components/PreviewModal';
-import { HistoryDrawer } from './components/HistoryDrawer';
-import { CodeSnippetModal } from './components/CodeSnippetModal';
-import { FormatGuide } from './components/FormatGuide';
 import { FORMAT_OPTIONS } from './components/FormatDropdown';
 import { Sparkles, RefreshCw, Zap, ShieldCheck, HeartHandshake } from 'lucide-react';
+
+// Heavy modal components load on demand — keeps the initial bundle small.
+const ConversionOptionsModal = lazy(() => import('./components/ConversionOptionsModal').then(m => ({ default: m.ConversionOptionsModal })));
+const PreviewModal = lazy(() => import('./components/PreviewModal').then(m => ({ default: m.PreviewModal })));
+const HistoryDrawer = lazy(() => import('./components/HistoryDrawer').then(m => ({ default: m.HistoryDrawer })));
+const CodeSnippetModal = lazy(() => import('./components/CodeSnippetModal').then(m => ({ default: m.CodeSnippetModal })));
+const FormatGuide = lazy(() => import('./components/FormatGuide').then(m => ({ default: m.FormatGuide })));
 
 export default function App() {
   const [isDark, setIsDark] = useState(true);
@@ -347,6 +348,8 @@ export default function App() {
     const completedItems = queue.filter((item) => item.status === 'completed' && item.convertedBlob);
     if (completedItems.length === 0) return;
 
+    // JSZip loads only when the user actually zips — keeps it out of the initial bundle.
+    const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
     completedItems.forEach((item) => {
       if (item.convertedBlob && item.convertedName) {
@@ -550,43 +553,45 @@ export default function App() {
       </AnimatePresence>
 
       {/* Modals & Drawers */}
-      {optionsItem && (
-        <ConversionOptionsModal
-          item={optionsItem}
-          isOpen={!!optionsItem}
-          onClose={() => setOptionsItem(null)}
-          onSaveOptions={handleSaveOptions}
+      <Suspense fallback={null}>
+        {optionsItem && (
+          <ConversionOptionsModal
+            item={optionsItem}
+            isOpen={!!optionsItem}
+            onClose={() => setOptionsItem(null)}
+            onSaveOptions={handleSaveOptions}
+          />
+        )}
+
+        {previewItem && (
+          <PreviewModal
+            item={previewItem}
+            isOpen={!!previewItem}
+            onClose={() => setPreviewItem(null)}
+            onDownload={handleDownloadSingle}
+          />
+        )}
+
+        <HistoryDrawer
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          history={history}
+          onClearHistory={() => setHistory([])}
         />
-      )}
 
-      {previewItem && (
-        <PreviewModal
-          item={previewItem}
-          isOpen={!!previewItem}
-          onClose={() => setPreviewItem(null)}
-          onDownload={handleDownloadSingle}
+        <CodeSnippetModal
+          isOpen={isCodeModalOpen}
+          onClose={() => setIsCodeModalOpen(false)}
+          category={queue[0]?.category || 'image'}
+          sourceFormat={queue[0]?.originalExtension || 'png'}
+          targetFormat={queue[0]?.targetFormat || 'jpg'}
         />
-      )}
 
-      <HistoryDrawer
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onClearHistory={() => setHistory([])}
-      />
-
-      <CodeSnippetModal
-        isOpen={isCodeModalOpen}
-        onClose={() => setIsCodeModalOpen(false)}
-        category={queue[0]?.category || 'image'}
-        sourceFormat={queue[0]?.originalExtension || 'png'}
-        targetFormat={queue[0]?.targetFormat || 'jpg'}
-      />
-
-      <FormatGuide
-        isOpen={isFormatGuideOpen}
-        onClose={() => setIsFormatGuideOpen(false)}
-      />
+        <FormatGuide
+          isOpen={isFormatGuideOpen}
+          onClose={() => setIsFormatGuideOpen(false)}
+        />
+      </Suspense>
 
       {/* Footer */}
       <footer className="relative z-10 mt-auto py-6 border-t border-white/10 text-center text-xs text-slate-400">

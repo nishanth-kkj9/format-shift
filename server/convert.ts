@@ -4,6 +4,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ffmpegPath from "ffmpeg-static";
 
+export class NoAudioStreamError extends Error {
+  constructor() {
+    super("Source has no audio stream to extract");
+    this.name = "NoAudioStreamError";
+  }
+}
+
+export class UnsupportedFormatError extends Error {
+  constructor(format: string) {
+    super(`Unsupported target format: ${format}`);
+    this.name = "UnsupportedFormatError";
+  }
+}
+
+export class UnsupportedConversionError extends Error {
+  constructor(category: string, target: string) {
+    super(`Conversion not supported for ${category} -> ${target}`);
+    this.name = "UnsupportedConversionError";
+  }
+}
+
 export interface ConvertOptions {
   targetFormat: string;
   category: string;
@@ -77,14 +98,21 @@ function cleanupTempDir(tmpFile: string | null): void {
 
 // pan:tail: avif/ico muxers need seekable output (header written after frames), so write those to a
 // temp file instead of streaming to stdout. Upgrade path: memory-cost-free, files are small.
-function runFFmpeg(args: string[], input: Buffer, seekableSuffix = ""): Promise<Buffer> {
+function runFFmpeg(
+  args: string[],
+  input?: Buffer,
+  seekableSuffix = "",
+  inputPath?: string
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     if (!ffmpegPath) return reject(new Error("ffmpeg binary not available"));
     const outArgs = [...args, "pipe:1"];
     const tmpFile = seekableSuffix ? join(mkdtempSync(join(tmpdir(), "fs-")), `out.${seekableSuffix}`) : null;
     const finalArgs = tmpFile ? [...args, tmpFile] : outArgs;
 
-    const proc = spawn(ffmpegPath, ["-hide_banner", "-i", "pipe:0", ...finalArgs]);
+    // Streaming input: pass the on-disk file path directly so we never buffer the whole file in RAM.
+    const inputArgs = inputPath ? ["-i", inputPath] : ["-i", "pipe:0"];
+    const proc = spawn(ffmpegPath, ["-hide_banner", ...inputArgs, ...finalArgs]);
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     proc.stdout.on("data", (c: Buffer) => out.push(c));
@@ -114,8 +142,10 @@ function runFFmpeg(args: string[], input: Buffer, seekableSuffix = ""): Promise<
         reject(new Error(`ffmpeg failed (${code}): ${lastErr}`));
       }
     });
-    proc.stdin.write(input);
-    proc.stdin.end();
+    if (input && !inputPath) {
+      proc.stdin.write(input);
+      proc.stdin.end();
+    }
   });
 }
 
@@ -155,12 +185,13 @@ export function imageFilters(opts: ConvertOptions): string[] {
 // pan:tail: images pass through ffmpeg too (avif/bmp/ico have encoders lacking in browsers)
 export async function convertFile(
   input: Buffer,
-  opts: ConvertOptions
+  opts: ConvertOptions,
+  inputPath?: string
 ): Promise<{ data: Buffer; mime: string }> {
   const tgt = opts.targetFormat.toLowerCase();
   const cat = opts.category?.toLowerCase();
   const mime = MIME[tgt];
-  if (!mime) throw new Error(`Unsupported target format: ${tgt}`);
+  if (!mime) throw new UnsupportedFormatError(tgt);
 
   const isVideoTarget = ["mp4", "mov", "mkv", "avi", "webm", "gif"].includes(tgt);
   const isAudioTarget = AUDIO_CODECS[tgt] && !isVideoTarget;
@@ -169,7 +200,7 @@ export async function convertFile(
     // pan:tail: bmp has no standalone muxer (use -c:v + image2pipe); avif/ico need seekable output for late header
     const outFmt = tgt === "jpg" ? ["-f", "mjpeg"] : tgt === "bmp" ? ["-c:v", "bmp", "-f", "image2pipe"] : ["-f", tgt];
     const seekable = ["avif", "ico"].includes(tgt) ? tgt : "";
-    const data = await runFFmpeg([...imageFilters(opts), ...outFmt], input, seekable);
+    const data = await runFFmpeg([...imageFilters(opts), ...outFmt], input, seekable, inputPath);
     return { data, mime };
   }
 
@@ -183,9 +214,9 @@ export async function convertFile(
     if (opts.trimEnd) args.push("-to", String(opts.trimEnd));
     const fmt = tgt === "m4a" ? "ipod" : tgt === "aac" ? "adts" : tgt;
     args.push("-f", fmt);
-    const data = await runFFmpeg(args, input, tgt === "m4a" ? "m4a" : "").catch((e: Error) => {
+    const data = await runFFmpeg(args, input, tgt === "m4a" ? "m4a" : "", inputPath).catch((e: Error) => {
       if (/does not contain any stream/i.test(e.message)) {
-        throw new Error("Source has no audio stream to extract");
+        throw new NoAudioStreamError();
       }
       throw e;
     });
@@ -207,9 +238,9 @@ export async function convertFile(
     const fmt = tgt === "mkv" ? "matroska" : tgt;
     args.push("-f", fmt);
     // pan:tail: mov/mkv/mp4(+faststart) write index after frames — need seekable output (temp file)
-    const data = await runFFmpeg(args, input, ["mov", "mkv", "mp4"].includes(tgt) ? "mp4" : "");
+    const data = await runFFmpeg(args, input, ["mov", "mkv", "mp4"].includes(tgt) ? "mp4" : "", inputPath);
     return { data, mime };
   }
 
-  throw new Error(`Conversion not supported for ${cat} -> ${tgt}`);
+  throw new UnsupportedConversionError(cat || "", tgt);
 }
