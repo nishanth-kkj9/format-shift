@@ -1,7 +1,10 @@
-import { TargetFormat, VideoConversionOptions, AudioConversionOptions } from '../types';
-import { convertAudio } from './convertAudio';
+import { TargetFormat, VideoConversionOptions } from '../types';
+import { planConversion } from '../core/conversionRegistry';
 
-// Convert Video format / Video to WEBM/MP4/GIF
+// Convert Video format / Video to WEBM/MP4/GIF (browser path).
+// All video targets route to the FFmpeg server via the conversion registry for
+// production reliability; this browser path is kept as a fallback but never
+// silently substitutes a different container than the one requested.
 export async function convertVideo(
   file: File,
   targetFormat: TargetFormat,
@@ -11,10 +14,11 @@ export async function convertVideo(
 ): Promise<{ blob: Blob; dimensions?: { width: number; height: number }; duration?: number }> {
   onProgress?.(10);
 
-  // If user selected audio format target from video (e.g. video -> WAV/MP3), route to audio converter!
-  if (targetFormat === 'wav' || targetFormat === 'mp3' || targetFormat === 'ogg' || targetFormat === 'aac') {
-    const audioOpts: AudioConversionOptions = { bitrate: '192k', sampleRate: 44100, channels: 2, volume: 100 };
-    return convertAudio(file, targetFormat, audioOpts, onProgress);
+  // If user selected audio format target from video (e.g. video -> WAV/MP3), it must
+  // run on the server (registry marks video->audio as server engine). Refuse here.
+  const plan = planConversion('video', targetFormat);
+  if (plan.supported === false || plan.target.engine !== 'browser') {
+    throw new Error(`Video -> ${targetFormat} must run on the FFmpeg server`);
   }
 
   return new Promise((resolve, reject) => {
@@ -34,21 +38,29 @@ export async function convertVideo(
         reject(new DOMException('Aborted', 'AbortError'));
         return;
       }
-      let targetWidth = video.videoWidth;
-      let targetHeight = video.videoHeight;
+      const srcWidth = video.videoWidth;
+      const srcHeight = video.videoHeight;
 
-      if (options.resolution === '1080p') {
-        targetWidth = 1920;
-        targetHeight = 1080;
-      } else if (options.resolution === '720p') {
-        targetWidth = 1280;
-        targetHeight = 720;
-      } else if (options.resolution === '480p') {
-        targetWidth = 854;
-        targetHeight = 480;
-      } else if (options.resolution === '360p') {
-        targetWidth = 640;
-        targetHeight = 360;
+      // Preserve aspect ratio when scaling down to a preset resolution.
+      let targetWidth = srcWidth;
+      let targetHeight = srcHeight;
+      const preset = options.resolution;
+      if (preset && preset !== 'original') {
+        const presets: Record<string, { w: number; h: number }> = {
+          '1080p': { w: 1920, h: 1080 },
+          '720p': { w: 1280, h: 720 },
+          '480p': { w: 854, h: 480 },
+          '360p': { w: 640, h: 360 },
+        };
+        const p = presets[preset];
+        if (p && srcWidth > 0 && srcHeight > 0) {
+          const scale = Math.min(p.w / srcWidth, p.h / srcHeight);
+          targetWidth = Math.round(srcWidth * scale);
+          targetHeight = Math.round(srcHeight * scale);
+          // ensure even dimensions for encoder compatibility
+          if (targetWidth % 2 !== 0) targetWidth += 1;
+          if (targetHeight % 2 !== 0) targetHeight += 1;
+        }
       }
 
       const canvas = document.createElement('canvas');
@@ -59,17 +71,16 @@ export async function convertVideo(
       const fps = options.fps || 30;
       const canvasStream = canvas.captureStream(fps);
 
-      let mediaRecorder: MediaRecorder;
-      const mimeType = targetFormat === 'mp4' && MediaRecorder.isTypeSupported('video/mp4')
-        ? 'video/mp4'
-        : 'video/webm';
-
-      try {
-        mediaRecorder = new MediaRecorder(canvasStream, { mimeType });
-      } catch {
-        mediaRecorder = new MediaRecorder(canvasStream);
+      // Never fall back to webm when the requested container is unsupported —
+      // fail loudly so the caller routes to FFmpeg instead of mislabeling output.
+      const requestedType = targetFormat === 'mp4' ? 'video/mp4' : 'video/webm';
+      if (!MediaRecorder.isTypeSupported(requestedType)) {
+        URL.revokeObjectURL(videoUrl);
+        reject(new Error(`This browser cannot record ${requestedType} (server conversion required)`));
+        return;
       }
 
+      const mediaRecorder = new MediaRecorder(canvasStream, { mimeType: requestedType });
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
@@ -88,7 +99,7 @@ export async function convertVideo(
         onProgress?.(100);
         abortSignal?.removeEventListener('abort', handleAbort);
         URL.revokeObjectURL(videoUrl);
-        const finalBlob = new Blob(chunks, { type: mimeType });
+        const finalBlob = new Blob(chunks, { type: requestedType });
         resolve({
           blob: finalBlob,
           dimensions: { width: targetWidth, height: targetHeight },

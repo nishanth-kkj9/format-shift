@@ -12,6 +12,10 @@ export async function convertDataDocument(
   onProgress?.(50);
 
   const tgt = targetFormat.toLowerCase();
+  const browserDataTargets = ['json', 'csv', 'tsv', 'xml', 'yaml', 'txt', 'md', 'html'];
+  if (!browserDataTargets.includes(tgt)) {
+    throw new Error(`Document/Data -> ${targetFormat} is not supported; use a server engine`);
+  }
   let resultText = '';
 
   try {
@@ -31,9 +35,9 @@ export async function convertDataDocument(
         resultText = JSON.stringify(parsed, null, options?.indentSpaces || 2);
       }
     }
-    // 2. Convert CSV / TSV
-    else if (file.name.endsWith('.csv') || file.name.endsWith('.tsv') || text.includes(',')) {
-      const sep = file.name.endsWith('.tsv') ? '\t' : ',';
+    // 2. Convert CSV / TSV (detect only when the header row looks tabular)
+    else if (/^[^"']*[,\t]/.test(text.trim())) {
+      const sep = file.name.endsWith('.tsv') || file.name.endsWith('.tab') ? '\t' : ',';
       const parsedJson = csvToJson(text, sep);
       if (tgt === 'json') {
         resultText = JSON.stringify(parsedJson, null, options?.indentSpaces || 2);
@@ -67,9 +71,11 @@ export async function convertDataDocument(
   let mimeType = 'text/plain';
   if (tgt === 'json') mimeType = 'application/json';
   else if (tgt === 'csv') mimeType = 'text/csv';
+  else if (tgt === 'tsv') mimeType = 'text/tab-separated-values';
+  else if (tgt === 'yaml') mimeType = 'application/yaml';
   else if (tgt === 'xml') mimeType = 'application/xml';
   else if (tgt === 'html') mimeType = 'text/html';
-  else if (tgt === 'pdf') mimeType = 'application/pdf';
+  else if (tgt === 'md') mimeType = 'text/markdown';
 
   const blob = new Blob([resultText], { type: mimeType });
   onProgress?.(100);
@@ -87,19 +93,32 @@ function isJson(str: string): boolean {
   }
 }
 
-// Split a CSV line into fields, respecting double-quoted sections and escaped quotes ("").
-function parseCsvLine(line: string, delimiter: string): string[] {
-  const fields: string[] = [];
+// Split CSV text into records respecting RFC-4180: double-quoted fields may span
+// multiple lines, and "" is an escaped quote inside a quoted field.
+function parseCsv(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let fields: string[] = [];
   let current = '';
   let inQuotes = false;
+  let i = 0;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+  // Normalize CRLF so records don't break on \r alone.
+  const src = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const endField = () => {
+    fields.push(current.trim());
+    current = '';
+  };
+  const endRecord = () => {
+    endField();
+    rows.push(fields);
+    fields = [];
+  };
 
+  while (i < src.length) {
+    const char = src[i];
     if (inQuotes) {
       if (char === '"') {
-        // Check for escaped quote ("" inside a quoted field)
-        if (line[i + 1] === '"') {
+        if (src[i + 1] === '"') {
           current += '"';
           i++;
         } else {
@@ -112,16 +131,19 @@ function parseCsvLine(line: string, delimiter: string): string[] {
       if (char === '"') {
         inQuotes = true;
       } else if (char === delimiter) {
-        fields.push(current.trim());
-        current = '';
+        endField();
+      } else if (char === '\n') {
+        endRecord();
       } else {
         current += char;
       }
     }
+    i++;
   }
+  // Flush any trailing field/record.
+  if (current !== '' || fields.length > 0 || inQuotes) endRecord();
 
-  fields.push(current.trim());
-  return fields;
+  return rows;
 }
 
 export function jsonToCsv(json: unknown, delimiter = ','): string {
@@ -150,23 +172,32 @@ export function jsonToCsv(json: unknown, delimiter = ','): string {
 }
 
 export function csvToJson(csvText: string, delimiter = ','): Record<string, string>[] {
-  const lines = csvText.trim().split('\n');
-  if (lines.length === 0) return [];
+  const records = parseCsv(csvText, delimiter);
+  if (records.length === 0) return [];
 
-  const headers = parseCsvLine(lines[0], delimiter);
+  const headers = records[0];
   const results: Record<string, string>[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const values = parseCsvLine(lines[i], delimiter);
+  for (let i = 1; i < records.length; i++) {
+    const values = records[i];
+    if (values.length === 1 && values[0].trim() === '') continue;
     const obj: Record<string, string> = {};
     headers.forEach((h, index) => {
-      obj[h] = values[index] || '';
+      obj[h] = values[index] ?? '';
     });
     results.push(obj);
   }
 
   return results;
+}
+
+function escapeXml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 export function jsonToXml(obj: unknown, rootName = 'root'): string {
@@ -187,17 +218,44 @@ export function jsonToXml(obj: unknown, rootName = 'root'): string {
           buildXml(val, indent + '  ');
           xml += `${indent}</${cleanKey}>\n`;
         } else {
-          xml += `${indent}<${cleanKey}>${val}</${cleanKey}>\n`;
+          xml += `${indent}<${cleanKey}>${escapeXml(val)}</${cleanKey}>\n`;
         }
       });
     } else {
-      xml += `${indent}${data}\n`;
+      xml += `${indent}${escapeXml(data)}\n`;
     }
   }
 
   buildXml(obj);
   xml += `</${rootName}>`;
   return xml;
+}
+
+// Quote a scalar only when plain output would be ambiguous (colon+space,
+// leading/trailing space, special indicators, or YAML-special values).
+function yamlScalar(value: unknown): string {
+  if (typeof value === 'string') {
+    if (
+      value === '' ||
+      value === 'null' ||
+      value === 'true' ||
+      value === 'false' ||
+      value === 'yes' ||
+      value === 'no' ||
+      value === 'on' ||
+      value === 'off' ||
+      value === '~' ||
+      /^[-+0-9.]/.test(value) ||
+      /[:#&*!|>'"%@`]/.test(value) ||
+      /^\s|\s$/.test(value) ||
+      /[\n\r\t]/.test(value)
+    ) {
+      return JSON.stringify(value);
+    }
+    return value;
+  }
+  if (typeof value === 'number' && Number.isNaN(value)) return 'null';
+  return String(value);
 }
 
 export function jsonToYaml(obj: unknown, indent = 0): string {
@@ -209,19 +267,20 @@ export function jsonToYaml(obj: unknown, indent = 0): string {
       if (typeof item === 'object' && item !== null) {
         yaml += `${spaces}-\n${jsonToYaml(item, indent + 2)}`;
       } else {
-        yaml += `${spaces}- ${item}\n`;
+        yaml += `${spaces}- ${yamlScalar(item)}\n`;
       }
     });
   } else if (typeof obj === 'object' && obj !== null) {
     Object.entries(obj as Record<string, unknown>).forEach(([key, val]) => {
+      const safeKey = /[:#]/.test(key) ? JSON.stringify(key) : key;
       if (typeof val === 'object' && val !== null) {
-        yaml += `${spaces}${key}:\n${jsonToYaml(val, indent + 2)}`;
+        yaml += `${spaces}${safeKey}:\n${jsonToYaml(val, indent + 2)}`;
       } else {
-        yaml += `${spaces}${key}: ${val}\n`;
+        yaml += `${spaces}${safeKey}: ${yamlScalar(val)}\n`;
       }
     });
   } else {
-    yaml += `${spaces}${obj}\n`;
+    yaml += `${spaces}${yamlScalar(obj)}\n`;
   }
 
   return yaml;

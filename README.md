@@ -75,11 +75,11 @@ This approach reduces unnecessary uploads while still supporting media formats t
 
 - JSON, CSV, TSV, XML and YAML conversions.
 - JSON ↔ CSV/TSV/XML/YAML transformations.
-- CSV/TSV parsing with quoted-field handling.
+- RFC-4180 CSV/TSV parsing with quoted-field and multiline handling.
 - Markdown/text → HTML conversion.
-- Text/Markdown/HTML/PDF document targets are exposed by the application.
+- Plain-text, Markdown and HTML document targets (all browser-side).
 
-> **Current implementation note:** data/document conversion is primarily text-based and browser-side. The current implementation does not provide a full PDF rendering engine; a `.pdf` target is currently represented as text content with a PDF MIME type rather than a production-grade PDF layout generator. Treat PDF conversion as an area for future improvement.
+> **Current implementation note:** data/document conversion is text-based and browser-side. There is no full PDF rendering engine, so PDF is accepted as an *input* source but is **not** offered as an output target — asking for a PDF target returns an explicit "unsupported" error rather than a fake file.
 
 ### UX
 
@@ -137,10 +137,11 @@ The frontend contains category-specific conversion modules:
 
 The Express API handles conversions requiring FFmpeg:
 
-- `server/upload.ts` streams multipart files to temporary storage instead of buffering the complete upload in memory.
-- `server/convert.ts` invokes `ffmpeg-static` and applies codec/filter settings.
-- `server/routes/convert.ts` exposes the conversion endpoint and cleans temporary files after processing.
-- `server/routes/templates.ts` generates conversion code examples.
+- `server/upload.ts` streams multipart files to temporary storage instead of buffering the complete upload in memory, writes to a randomized temp filename (never the client-provided name) and keeps the original name separately.
+- `server/ffmpeg/` contains the FFmpeg pipeline: `runner.ts` (spawns ffmpeg, writes to a seekable temp file, kills the child on client disconnect), `filters.ts` (image), `audio.ts` (audio encode / video→audio), `video.ts` (container conversion).
+- `server/convert.ts` orchestrates the pipeline and derives allowed targets from the shared conversion registry.
+- `server/routes/convert.ts` streams the result back to the client and cleans up temp files after the request.
+- `server/routes/templates.ts` generates code examples only for conversions the registry actually supports.
 
 The upload layer also performs category-specific size checks and best-effort magic-byte MIME validation before conversion.
 
@@ -148,13 +149,15 @@ The upload layer also performs category-specific size checks and best-effort mag
 
 ## 📦 Supported Formats
 
-| Category | Formats / Targets | Main processing path |
-|---|---|---|
-| **Image** | PNG, JPG, JPEG, WEBP, GIF, BMP, ICO, SVG, AVIF | Browser + FFmpeg fallback |
-| **Audio** | MP3, WAV, OGG, AAC, M4A, FLAC | Browser WAV + FFmpeg for compressed targets |
-| **Video** | MP4, WEBM, GIF, MOV, MKV, AVI | Browser where supported + FFmpeg |
-| **Data** | JSON, CSV, TSV, XML, YAML | Browser |
-| **Document** | PDF, TXT, Markdown, HTML | Browser/text pipeline |
+All targets below are defined once in `src/core/conversionRegistry.ts`; the UI, detection, server endpoint and code templates all derive from it. No conversion is advertised that the app cannot genuinely perform.
+
+| Category | Targets | Browser engine | Server (FFmpeg) engine |
+|---|---|---|---|
+| **Image** | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF | JPG, JPEG, PNG, WEBP, SVG | GIF, BMP, ICO, AVIF (and any browser target via API) |
+| **Audio** | WAV, MP3, OGG, AAC, M4A, FLAC, MP4, WEBM | WAV, MP4/WEBM (spectrum visualizer) | MP3, OGG, AAC, M4A, FLAC |
+| **Video** | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server) | All |
+| **Data** | JSON, CSV, TSV, XML, YAML | All | — |
+| **Document** | TXT, MD, HTML | All (PDF/TXT/MD/HTML accepted as *sources*) | — |
 
 ### Server upload limits
 
@@ -402,12 +405,21 @@ format-shift/
 ├── server/
 │   ├── convert.ts
 │   ├── convert.test.ts
+│   ├── e2e-server.mjs
 │   ├── integration.test.ts
 │   ├── upload.ts
+│   ├── ffmpeg/
+│   │   ├── audio.ts
+│   │   ├── filters.ts
+│   │   ├── runner.ts
+│   │   └── video.ts
 │   └── routes/
 │       ├── convert.ts
 │       └── templates.ts
 ├── src/
+│   ├── core/
+│   │   ├── conversionRegistry.ts
+│   │   └── conversionRegistry.test.ts
 │   ├── components/
 │   │   ├── BatchBar.tsx
 │   │   ├── CodeSnippetModal.tsx
@@ -463,11 +475,10 @@ FormatShift is a file-processing application, so a public deployment should stil
 ## ⚠️ Current Limitations
 
 - Browser codec support varies by browser and operating system.
-- Some browser `canvas.toBlob()` formats can fall back to PNG when the requested encoder is unavailable.
+- Browser `canvas.toBlob()` encoders that are unavailable now surface a clear error (and the image may be retried on the server API) rather than silently returning a PNG.
 - Large client-side media conversions can consume significant browser memory.
 - Server-side FFmpeg conversions consume CPU and temporary disk space.
-- The current document pipeline is not a full office/PDF conversion engine.
-- PDF output is currently not a true layout-preserving PDF renderer.
+- The document pipeline is text-based, not a full office/PDF conversion engine; PDF is accepted as an input but never advertised as an output.
 - Conversion options are category-specific and not every UI option applies to every output format.
 - Code templates are illustrative snippets, not a guarantee that every generated snippet supports every FormatShift option.
 
@@ -477,11 +488,9 @@ FormatShift is a file-processing application, so a public deployment should stil
 
 - [ ] Add a real PDF generation/rendering pipeline.
 - [ ] Add richer document conversions such as DOCX/ODT.
-- [ ] Improve CSV parsing for multiline quoted fields and more dialects.
-- [ ] Add stronger MIME/content validation for text formats.
 - [ ] Add conversion job IDs and asynchronous server workers for large files.
 - [ ] Add configurable server storage/cleanup policies.
-- [ ] Add more comprehensive end-to-end browser tests.
+- [ ] Add Playwright end-to-end browser tests.
 - [ ] Add performance benchmarks for large media files.
 - [ ] Add authentication, quotas, and per-user limits for public deployments.
 - [ ] Add downloadable conversion reports/metadata.

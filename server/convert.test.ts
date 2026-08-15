@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { imageFilters } from './convert';
+import { imageFilters } from './ffmpeg/filters';
 
 describe('imageFilters', () => {
   it('returns empty args for default options', () => {

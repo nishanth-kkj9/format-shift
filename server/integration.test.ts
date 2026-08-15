@@ -47,6 +47,16 @@ describe("POST /api/convert (streaming upload)", () => {
     expect(buf.length).toBeGreaterThan(0);
   }, 30000);
 
+  it("returns real output magic bytes matching the requested target", async () => {
+    const res = await postConvert(new Blob([TINY_PNG]), "test.png", "image", "webp");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("image/webp");
+    const buf = Buffer.from(await res.arrayBuffer());
+    // RIFF....WEBP
+    expect(buf.subarray(0, 4).toString("ascii")).toBe("RIFF");
+    expect(buf.subarray(8, 12).toString("ascii")).toBe("WEBP");
+  }, 30000);
+
   it("rejects a binary whose magic bytes don't match the declared category", async () => {
     const res = await postConvert(new Blob([ELF_BYTES]), "evil.png");
     expect(res.status).toBe(400);

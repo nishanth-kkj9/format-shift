@@ -1,4 +1,5 @@
 import { createWriteStream, mkdtempSync, rmSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -9,6 +10,7 @@ import type { IncomingMessage } from "node:http";
 export interface ParsedUpload {
   tempDir: string;
   filePath: string;
+  originalFilename: string;
   size: number;
   mimetype: string;
   category: string;
@@ -47,6 +49,7 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
   const fields: Record<string, string> = {};
   const tempDir = mkdtempSync(join(tmpdir(), "fs-up-"));
   let filePath: string | null = null;
+  let originalFilename = "";
   let size = 0;
   let mimetype = "";
   let head: Buffer[] = [];
@@ -58,7 +61,10 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
 
     busboy.on("file", (_name, stream, info) => {
       mimetype = info.mimeType;
-      filePath = join(tempDir, `input.${info.filename || "bin"}`);
+      originalFilename = info.filename || "upload.bin";
+      // Never trust the client filename as a path component — write to a random
+      // name inside the request-scoped temp dir to prevent path traversal.
+      filePath = join(tempDir, `input-${randomBytes(8).toString("hex")}.bin`);
       const writeStream = createWriteStream(filePath);
 
       stream.on("data", (chunk: Buffer) => {
@@ -121,6 +127,7 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
     return {
       tempDir,
       filePath,
+      originalFilename,
       size,
       mimetype,
       category,

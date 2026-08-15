@@ -1,13 +1,8 @@
 import {
-  FileCategory,
   TargetFormat,
-  ImageFormat,
-  AudioFormat,
-  VideoFormat,
-  DataFormat,
-  DocumentFormat,
   SocialMediaPreset,
 } from '../types';
+import { CONVERSION_REGISTRY, getAvailableTargets, FileCategory } from '../core/conversionRegistry';
 
 // Social Media Preset Dimensions Map
 export const SOCIAL_PRESETS: Record<Exclude<SocialMediaPreset, 'custom'>, { w: number; h: number; label: string }> = {
@@ -19,6 +14,11 @@ export const SOCIAL_PRESETS: Record<Exclude<SocialMediaPreset, 'custom'>, { w: n
   'facebook-cover': { w: 820, h: 312, label: 'Facebook Cover (820×312)' },
   favicon: { w: 32, h: 32, label: 'Favicon Icon (32×32)' },
 };
+
+const IMAGE_EXTS = new Set(CONVERSION_REGISTRY.image.sourceFormats);
+const AUDIO_EXTS = new Set(CONVERSION_REGISTRY.audio.sourceFormats);
+const VIDEO_EXTS = new Set(CONVERSION_REGISTRY.video.sourceFormats);
+const DATA_EXTS = new Set(CONVERSION_REGISTRY.data.sourceFormats);
 
 // Detect Category and Available Formats from File
 export function detectCategoryAndFormats(file: File): {
@@ -32,72 +32,55 @@ export function detectCategoryAndFormats(file: File): {
   const type = file.type.toLowerCase();
 
   // 1. Image Formats
-  const imageExts = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'svg', 'avif'];
-  if (type.startsWith('image/') || imageExts.includes(ext)) {
+  if (type.startsWith('image/') || IMAGE_EXTS.has(ext)) {
     const sourceFormat = ext || 'png';
-    const availableTargets: ImageFormat[] = ['jpg', 'png', 'webp', 'gif', 'bmp', 'ico', 'svg', 'avif'];
-    const defaultTargetFormat: ImageFormat = sourceFormat === 'png' ? 'jpg' : sourceFormat === 'jpg' || sourceFormat === 'jpeg' ? 'webp' : 'png';
     return {
       category: 'image',
       sourceFormat,
-      defaultTargetFormat,
-      availableTargets,
+      defaultTargetFormat: CONVERSION_REGISTRY.image.defaultTarget(sourceFormat) as TargetFormat,
+      availableTargets: getAvailableTargets('image') as TargetFormat[],
     };
   }
 
   // 2. Audio Formats
-  const audioExts = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'weba'];
-  if (type.startsWith('audio/') || audioExts.includes(ext)) {
+  if (type.startsWith('audio/') || AUDIO_EXTS.has(ext)) {
     const sourceFormat = ext || 'mp3';
-    // Audio can convert to audio formats OR Audio Spectrum Visualizer Video (MP4 / WEBM / GIF)
-    const availableTargets: (AudioFormat | VideoFormat)[] = ['wav', 'mp3', 'ogg', 'aac', 'flac', 'mp4', 'webm', 'gif'];
-    const defaultTargetFormat: TargetFormat = sourceFormat === 'wav' ? 'mp3' : 'wav';
     return {
       category: 'audio',
       sourceFormat,
-      defaultTargetFormat,
-      availableTargets: availableTargets as TargetFormat[],
+      defaultTargetFormat: CONVERSION_REGISTRY.audio.defaultTarget(sourceFormat) as TargetFormat,
+      availableTargets: getAvailableTargets('audio') as TargetFormat[],
     };
   }
 
   // 3. Video Formats
-  const videoExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'flv'];
-  if (type.startsWith('video/') || videoExts.includes(ext)) {
+  if (type.startsWith('video/') || VIDEO_EXTS.has(ext)) {
     const sourceFormat = ext || 'mp4';
-    // Videos can also be converted to GIF or audio formats!
-    const availableTargets: (VideoFormat | AudioFormat)[] = ['webm', 'mp4', 'gif', 'mov', 'wav', 'mp3'];
-    const defaultTargetFormat: TargetFormat = sourceFormat === 'mp4' ? 'webm' : 'mp4';
     return {
       category: 'video',
       sourceFormat,
-      defaultTargetFormat,
-      availableTargets: availableTargets as TargetFormat[],
+      defaultTargetFormat: CONVERSION_REGISTRY.video.defaultTarget(sourceFormat) as TargetFormat,
+      availableTargets: getAvailableTargets('video') as TargetFormat[],
     };
   }
 
   // 4. Data Formats
-  const dataExts = ['json', 'csv', 'tsv', 'xml', 'yaml', 'yml'];
-  if (dataExts.includes(ext) || type.includes('json') || type.includes('csv') || type.includes('xml')) {
+  if (DATA_EXTS.has(ext) || type.includes('json') || type.includes('csv') || type.includes('xml')) {
     const sourceFormat = ext || 'json';
-    const availableTargets: DataFormat[] = ['csv', 'json', 'xml', 'yaml', 'tsv'];
-    const defaultTargetFormat: DataFormat = sourceFormat === 'json' ? 'csv' : 'json';
     return {
       category: 'data',
       sourceFormat,
-      defaultTargetFormat,
-      availableTargets,
+      defaultTargetFormat: CONVERSION_REGISTRY.data.defaultTarget(sourceFormat) as TargetFormat,
+      availableTargets: getAvailableTargets('data') as TargetFormat[],
     };
   }
 
   // 5. Document Formats
-  const docExts = ['pdf', 'txt', 'md', 'html', 'htm'];
   const sourceFormat = ext || 'txt';
-  const availableTargets: TargetFormat[] = ['pdf', 'txt', 'md', 'html', 'png', 'jpg'];
-  const defaultTargetFormat: DocumentFormat = sourceFormat === 'md' ? 'html' : sourceFormat === 'html' ? 'pdf' : 'txt';
   return {
     category: 'document',
     sourceFormat,
-    defaultTargetFormat,
-    availableTargets,
+    defaultTargetFormat: CONVERSION_REGISTRY.document.defaultTarget(sourceFormat) as TargetFormat,
+    availableTargets: getAvailableTargets('document') as TargetFormat[],
   };
 }

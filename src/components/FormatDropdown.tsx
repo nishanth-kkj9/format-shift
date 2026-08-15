@@ -16,61 +16,83 @@ import {
   FileCode2,
 } from 'lucide-react';
 import { FileCategory, TargetFormat } from '../types';
+import { CONVERSION_REGISTRY, getAvailableTargets } from '../core/conversionRegistry';
 
 interface FormatOption {
   format: TargetFormat;
   label: string;
   badge: string;
+  engine: 'browser' | 'server';
   icon: React.ComponentType<{ className?: string }>;
   description?: string;
 }
 
-export const FORMAT_OPTIONS: Record<FileCategory, FormatOption[]> = {
-  image: [
-    { format: 'jpg', label: 'JPEG / JPG', badge: 'Universal', icon: Image, description: 'Best for standard photos & web' },
-    { format: 'png', label: 'PNG Image', badge: 'Lossless', icon: Image, description: 'Supports transparent background' },
-    { format: 'webp', label: 'WEBP Web', badge: 'Web Fast', icon: Sparkles, description: '30% smaller size for web' },
-    { format: 'gif', label: 'GIF Graphic', badge: 'Animated', icon: Film, description: 'Standard frame animations' },
-    { format: 'svg', label: 'SVG Vector', badge: 'Scalable', icon: Code, description: 'Vector graphics for web icons' },
-    { format: 'ico', label: 'ICO Favicon', badge: 'App Icon', icon: Sparkles, description: 'Favicon badge format' },
-    { format: 'avif', label: 'AVIF Next-Gen', badge: 'Next-Gen', icon: Sparkles, description: 'Ultra compression for web' },
-    { format: 'bmp', label: 'BMP Bitmap', badge: 'Raw', icon: Image, description: 'Uncompressed raw pixel image' },
-  ],
-  audio: [
-    { format: 'mp3', label: 'MP3 Audio', badge: 'Universal', icon: Music, description: 'Standard compressed audio' },
-    { format: 'wav', label: 'WAV Audio', badge: 'Lossless', icon: Disc, description: 'Studio quality uncompressed PCM' },
-    { format: 'ogg', label: 'OGG Vorbis', badge: 'Open Source', icon: Music, description: 'Optimized open-source media' },
-    { format: 'aac', label: 'AAC Audio', badge: 'Stream HD', icon: Music, description: 'High efficiency audio stream' },
-    { format: 'm4a', label: 'M4A Apple', badge: 'Apple AAC', icon: Music, description: 'Container for Apple devices' },
-    { format: 'flac', label: 'FLAC Hi-Fi', badge: 'Studio', icon: Disc, description: 'Lossless compressed audio' },
-    { format: 'mp4', label: 'MP4 Spectrum Video', badge: 'Visualizer', icon: Video, description: 'Animated audio spectrum video (MP4)' },
-    { format: 'webm', label: 'WEBM Spectrum Video', badge: 'Visualizer', icon: Video, description: 'Animated audio spectrum video (WEBM)' },
-  ],
-  video: [
-    { format: 'mp4', label: 'MP4 Video', badge: 'Universal', icon: Video, description: 'Standard H.264 video file' },
-    { format: 'webm', label: 'WEBM Video', badge: 'Web HD', icon: Video, description: 'HTML5 web player video' },
-    { format: 'gif', label: 'GIF Clip', badge: 'No Audio', icon: Film, description: 'Convert video clip to animated GIF' },
-    { format: 'mov', label: 'QuickTime MOV', badge: 'Apple', icon: Video, description: 'Apple QuickTime container' },
-    { format: 'avi', label: 'AVI Video', badge: 'Classic', icon: Video, description: 'Classic Audio Video Interleave' },
-    { format: 'mp3', label: 'Extract MP3', badge: 'Audio Only', icon: Music, description: 'Extract audio track from video' },
-    { format: 'wav', label: 'Extract WAV', badge: 'Lossless Audio', icon: Disc, description: 'Extract PCM audio from video' },
-  ],
-  data: [
-    { format: 'csv', label: 'CSV Table', badge: 'Spreadsheet', icon: FileSpreadsheet, description: 'Comma separated values for Excel' },
-    { format: 'json', label: 'JSON Data', badge: 'Structured', icon: FileCode2, description: 'Standard JavaScript object data' },
-    { format: 'xml', label: 'XML Doc', badge: 'Hierarchical', icon: Code, description: 'Extensible markup schema' },
-    { format: 'yaml', label: 'YAML Config', badge: 'Readable', icon: Code, description: 'Human readable configuration' },
-    { format: 'tsv', label: 'TSV Tabbed', badge: 'Tab Delimited', icon: Database, description: 'Tab delimited table data' },
-  ],
-  document: [
-    { format: 'pdf', label: 'PDF Document', badge: 'Print Spec', icon: FileText, description: 'Portable document format' },
-    { format: 'txt', label: 'Plain Text', badge: 'Raw Text', icon: FileText, description: 'Simple UTF-8 plain text file' },
-    { format: 'md', label: 'Markdown', badge: 'Docs Specs', icon: FileText, description: 'Formatted markdown text' },
-    { format: 'html', label: 'HTML Page', badge: 'Web Render', icon: Code, description: 'Hypertext webpage document' },
-    { format: 'png', label: 'Render PNG', badge: 'Page Image', icon: Image, description: 'Render document page as PNG' },
-    { format: 'jpg', label: 'Render JPG', badge: 'Page Image', icon: Image, description: 'Render document page as JPG' },
-  ],
+// UI metadata per (category, format). Format membership itself comes from the
+// conversion registry so the dropdown can never advertise a fake conversion.
+const FORMAT_META: Record<FileCategory, Record<string, Pick<FormatOption, 'label' | 'badge' | 'icon' | 'description'>>> = {
+  image: {
+    jpg: { label: 'JPEG / JPG', badge: 'Universal', icon: Image, description: 'Best for standard photos & web' },
+    png: { label: 'PNG Image', badge: 'Lossless', icon: Image, description: 'Supports transparent background' },
+    webp: { label: 'WEBP Web', badge: 'Web Fast', icon: Sparkles, description: '30% smaller size for web' },
+    gif: { label: 'GIF Graphic', badge: 'Animated', icon: Film, description: 'Standard frame animations' },
+    svg: { label: 'SVG Vector', badge: 'Scalable', icon: Code, description: 'Vector graphics for web icons' },
+    ico: { label: 'ICO Favicon', badge: 'App Icon', icon: Sparkles, description: 'Favicon badge format' },
+    avif: { label: 'AVIF Next-Gen', badge: 'Next-Gen', icon: Sparkles, description: 'Ultra compression for web' },
+    bmp: { label: 'BMP Bitmap', badge: 'Raw', icon: Image, description: 'Uncompressed raw pixel image' },
+  },
+  audio: {
+    mp3: { label: 'MP3 Audio', badge: 'Universal', icon: Music, description: 'Standard compressed audio' },
+    wav: { label: 'WAV Audio', badge: 'Lossless', icon: Disc, description: 'Studio quality uncompressed PCM' },
+    ogg: { label: 'OGG Vorbis', badge: 'Open Source', icon: Music, description: 'Optimized open-source media' },
+    aac: { label: 'AAC Audio', badge: 'Stream HD', icon: Music, description: 'High efficiency audio stream' },
+    m4a: { label: 'M4A Apple', badge: 'Apple AAC', icon: Music, description: 'Container for Apple devices' },
+    flac: { label: 'FLAC Hi-Fi', badge: 'Studio', icon: Disc, description: 'Lossless compressed audio' },
+    mp4: { label: 'MP4 Spectrum Video', badge: 'Visualizer', icon: Video, description: 'Animated audio spectrum video (MP4)' },
+    webm: { label: 'WEBM Spectrum Video', badge: 'Visualizer', icon: Video, description: 'Animated audio spectrum video (WEBM)' },
+  },
+  video: {
+    mp4: { label: 'MP4 Video', badge: 'Universal', icon: Video, description: 'Standard H.264 video file' },
+    webm: { label: 'WEBM Video', badge: 'Web HD', icon: Video, description: 'HTML5 web player video' },
+    gif: { label: 'GIF Clip', badge: 'No Audio', icon: Film, description: 'Convert video clip to animated GIF' },
+    mov: { label: 'QuickTime MOV', badge: 'Apple', icon: Video, description: 'Apple QuickTime container' },
+    mkv: { label: 'MKV Video', badge: 'Matroska', icon: Video, description: 'Matroska multimedia container' },
+    avi: { label: 'AVI Video', badge: 'Classic', icon: Video, description: 'Classic Audio Video Interleave' },
+    mp3: { label: 'Extract MP3', badge: 'Audio Only', icon: Music, description: 'Extract audio track from video' },
+    wav: { label: 'Extract WAV', badge: 'Lossless Audio', icon: Disc, description: 'Extract PCM audio from video' },
+    ogg: { label: 'Extract OGG', badge: 'Audio Only', icon: Music, description: 'Extract Vorbis audio from video' },
+    aac: { label: 'Extract AAC', badge: 'Audio Only', icon: Music, description: 'Extract AAC audio from video' },
+  },
+  data: {
+    csv: { label: 'CSV Table', badge: 'Spreadsheet', icon: FileSpreadsheet, description: 'Comma separated values for Excel' },
+    json: { label: 'JSON Data', badge: 'Structured', icon: FileCode2, description: 'Standard JavaScript object data' },
+    xml: { label: 'XML Doc', badge: 'Hierarchical', icon: Code, description: 'Extensible markup schema' },
+    yaml: { label: 'YAML Config', badge: 'Readable', icon: Code, description: 'Human readable configuration' },
+    tsv: { label: 'TSV Tabbed', badge: 'Tab Delimited', icon: Database, description: 'Tab delimited table data' },
+  },
+  document: {
+    txt: { label: 'Plain Text', badge: 'Raw Text', icon: FileText, description: 'Simple UTF-8 plain text file' },
+    md: { label: 'Markdown', badge: 'Docs Specs', icon: FileText, description: 'Formatted markdown text' },
+    html: { label: 'HTML Page', badge: 'Web Render', icon: Code, description: 'Hypertext webpage document' },
+  },
 };
+
+export const FORMAT_OPTIONS: Record<FileCategory, FormatOption[]> = Object.fromEntries(
+  (Object.keys(CONVERSION_REGISTRY) as FileCategory[]).map((category) => [
+    category,
+    getAvailableTargets(category).map((format) => {
+      const meta = FORMAT_META[category]?.[format];
+      const engine = CONVERSION_REGISTRY[category].targets[format].engine;
+      return {
+        format,
+        label: meta?.label ?? format.toUpperCase(),
+        badge: meta?.badge ?? (engine === 'server' ? 'FFmpeg' : 'Browser'),
+        engine,
+        icon: meta?.icon ?? Image,
+        description: meta?.description,
+      };
+    }),
+  ])
+) as Record<FileCategory, FormatOption[]>;
 
 interface FormatDropdownProps {
   value: TargetFormat;
@@ -228,6 +250,13 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
                       : 'bg-white/5 text-slate-400 group-hover:text-slate-200'
                   }`}>
                     {opt.badge}
+                  </span>
+                  <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider border ${
+                    opt.engine === 'server'
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-400/30'
+                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
+                  }`}>
+                    {opt.engine === 'server' ? 'FFmpeg' : 'Browser'}
                   </span>
                   {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400" />}
                 </div>

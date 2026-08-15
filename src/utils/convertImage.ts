@@ -3,6 +3,24 @@ import { SOCIAL_PRESETS } from './detect';
 
 export { dataUrlToBlob };
 
+// Which MIME type the canvas encoder must produce for a given target. If the
+// browser cannot produce it, we throw instead of silently returning a PNG.
+const TARGET_MIME: Record<string, string> = {
+  png: 'image/png',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+};
+
+function assertBlobMatches(blob: Blob | null, target: string): void {
+  const expected = TARGET_MIME[target];
+  if (!blob) {
+    throw new Error(`This browser cannot encode .${target} images (no blob output).`);
+  }
+  if (expected && blob.type !== expected) {
+    throw new Error(`This browser cannot encode .${target} images (got ${blob.type || 'unknown'} instead).`);
+  }
+}
+
 function dataUrlToBlob(dataUrl: string): Blob {
   const arr = dataUrl.split(',');
   const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
@@ -88,12 +106,11 @@ export async function convertImage(
           canvas.toBlob(
             (blob) => {
               onProgress?.(100);
-              if (blob) {
-                resolve({ blob, dimensions: { width: canvas.width, height: canvas.height } });
-              } else {
-                const dataUrl = canvas.toDataURL('image/png');
-                const fallbackBlob = dataUrlToBlob(dataUrl);
-                resolve({ blob: fallbackBlob, dimensions: { width: canvas.width, height: canvas.height } });
+              try {
+                assertBlobMatches(blob, tgt);
+                resolve({ blob: blob!, dimensions: { width: canvas.width, height: canvas.height } });
+              } catch (err) {
+                reject(err);
               }
             },
             mimeType,
@@ -209,13 +226,11 @@ export async function convertImage(
         canvas.toBlob(
           (blob) => {
             onProgress?.(100);
-            if (blob) {
-              resolve({ blob, dimensions: { width: canvas.width, height: canvas.height } });
-            } else {
-              // Fallback for browsers that don't support certain MIME types like BMP/AVIF directly
-              const dataUrl = canvas.toDataURL('image/png');
-              const fallbackBlob = dataUrlToBlob(dataUrl);
-              resolve({ blob: fallbackBlob, dimensions: { width: canvas.width, height: canvas.height } });
+            try {
+              assertBlobMatches(blob, tgt);
+              resolve({ blob: blob!, dimensions: { width: canvas.width, height: canvas.height } });
+            } catch (err) {
+              reject(err);
             }
           },
           mimeType,

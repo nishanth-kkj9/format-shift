@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { jsonToCsv, csvToJson, jsonToXml, jsonToYaml, markdownToHtml, formatBytes } from './converter';
+import {
+  jsonToCsv,
+  csvToJson,
+  jsonToXml,
+  jsonToYaml,
+  markdownToHtml,
+  formatBytes,
+} from './converter';
+import { convertDataDocument } from './convertData';
+import { convertAudio } from './convertAudio';
+import { convertImage } from './convertImage';
+import { convertVideo } from './convertVideo';
+import { planConversion } from '../core/conversionRegistry';
 
 describe('jsonToCsv', () => {
   it('converts array of objects to CSV with headers', () => {
@@ -125,5 +137,93 @@ describe('formatBytes', () => {
 
   it('formats MB', () => {
     expect(formatBytes(1024 * 1024)).toBe('1 MB');
+  });
+});
+
+describe('RFC-4180 CSV edge cases', () => {
+  it('parses quoted fields containing commas', () => {
+    const csv = 'name,city\n"Smith, John","Austin, TX"';
+    expect(csvToJson(csv)).toEqual([{ name: 'Smith, John', city: 'Austin, TX' }]);
+  });
+
+  it('parses escaped quotes inside quoted fields', () => {
+    const csv = 'note\n"He said ""hi"""';
+    expect(csvToJson(csv)[0].note).toBe('He said "hi"');
+  });
+
+  it('parses quoted fields spanning multiple lines', () => {
+    const csv = 'name,desc\nAlice,"line one\nline two"';
+    const rows = csvToJson(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].desc).toBe('line one\nline two');
+  });
+
+  it('tolerates CRLF line endings', () => {
+    const csv = 'a,b\r\n1,2\r\n3,4\r\n';
+    expect(csvToJson(csv)).toEqual([{ a: '1', b: '2' }, { a: '3', b: '4' }]);
+  });
+
+  it('skips blank rows', () => {
+    const csv = 'a,b\n1,2\n\n3,4\n';
+    expect(csvToJson(csv)).toHaveLength(2);
+  });
+});
+
+describe('XML escaping', () => {
+  it('escapes special characters in text values', () => {
+    const xml = jsonToXml({ title: 'a < b & c > "d"' });
+    expect(xml).toContain('<title>a &lt; b &amp; c &gt; &quot;d&quot;</title>');
+    expect(xml).not.toContain('<title>a < b');
+  });
+});
+
+describe('YAML quoting', () => {
+  it('quotes strings that would parse as numbers or booleans', () => {
+    const yaml = jsonToYaml({ version: '1.0', enabled: 'true', empty: '' });
+    expect(yaml).toContain('version: "1.0"');
+    expect(yaml).toContain('enabled: "true"');
+    expect(yaml).toContain('empty: ""');
+  });
+
+  it('quotes strings containing colons', () => {
+    const yaml = jsonToYaml({ note: 'http://example.com' });
+    expect(yaml).toContain('note: "http://example.com"');
+  });
+});
+
+// Negative tests: converting to a format the engine genuinely cannot produce must
+// throw, never silently substitute a different format (P1#19).
+describe('browser converters refuse unsupported targets', () => {
+  const fakeFile = (name: string, type: string, content: BlobPart) =>
+    new File([content], name, { type });
+
+  it('convertDataDocument rejects fake document targets', async () => {
+    const file = fakeFile('doc.txt', 'text/plain', 'hello');
+    await expect(
+      convertDataDocument(file, 'pdf' as never, undefined, () => {})
+    ).rejects.toThrow(/not supported/);
+  });
+
+  it('convertAudio rejects targets that must run server-side', async () => {
+    const file = fakeFile('a.mp3', 'audio/mpeg', 'x');
+    await expect(
+      convertAudio(file, 'mp3' as never, { bitrate: '192k', sampleRate: 44100, channels: 2, volume: 100 }, () => {})
+    ).rejects.toThrow(/FFmpeg server/);
+  });
+
+  it('convertVideo rejects server-only containers', async () => {
+    const file = fakeFile('v.mp4', 'video/mp4', 'x');
+    await expect(
+      convertVideo(file, 'mkv' as never, { resolution: 'original', fps: 30, muteAudio: false }, () => {})
+    ).rejects.toThrow(/FFmpeg server/);
+  });
+
+  it('planConversion says document->pdf is unsupported', () => {
+    const plan = planConversion('document', 'pdf');
+    expect(plan.supported).toBe(false);
+  });
+
+  it('planConversion says image->docx is unsupported', () => {
+    expect(planConversion('image', 'docx').supported).toBe(false);
   });
 });

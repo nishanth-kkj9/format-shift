@@ -1,20 +1,18 @@
 import { ConversionOptions } from '../types';
+import { FileCategory, needsServerEngine, planConversion } from '../core/conversionRegistry';
 
-// Targets the browser can't genuinely produce client-side — route these to the local backend.
-const SERVER_IMAGE_TARGETS = new Set(['avif', 'ico', 'bmp', 'gif']);
-const SERVER_AUDIO_TARGETS = new Set(['mp3', 'aac', 'm4a', 'flac', 'ogg']);
-const SERVER_VIDEO_TARGETS = new Set(['mp4', 'mov', 'mkv', 'avi', 'gif']);
+export { needsServerEngine };
 
+/** Client-side router: should this category+target go to the ffmpeg backend? */
 export function needsServerConversion(category: string, targetFormat: string): boolean {
-  const tgt = targetFormat.toLowerCase();
-  if (category === 'image') return SERVER_IMAGE_TARGETS.has(tgt);
-  if (category === 'audio') return SERVER_AUDIO_TARGETS.has(tgt);
-  if (category === 'video') {
-    // video -> audio extraction needs ffmpeg too
-    if (SERVER_AUDIO_TARGETS.has(tgt)) return true;
-    return SERVER_VIDEO_TARGETS.has(tgt);
-  }
-  return false;
+  return needsServerEngine(category as FileCategory, targetFormat);
+}
+
+/** Validate a conversion plan up front so we never hit the network for fake ops. */
+export function assertSupportedConversion(category: string, targetFormat: string): void {
+  const plan = planConversion(category as FileCategory, targetFormat);
+  if (plan.supported === false) throw new Error(plan.reason);
+
 }
 
 export async function convertServerSide(
@@ -25,6 +23,8 @@ export async function convertServerSide(
   options: ConversionOptions,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
+  assertSupportedConversion(category, targetFormat);
+
   const form = new FormData();
   form.append('file', file);
   form.append('category', category);
