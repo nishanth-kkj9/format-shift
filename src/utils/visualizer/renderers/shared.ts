@@ -11,7 +11,7 @@ export interface RenderContext {
   duration: number;
 }
 
-// Deep glass background with a beat-reactive radial glow.
+// Deep glass background with a subtle, beat-reactive radial glow.
 export function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, rc: RenderContext): void {
   const c = rc.theme.colors;
   ctx.fillStyle = c.background;
@@ -19,11 +19,11 @@ export function drawBackground(ctx: CanvasRenderingContext2D, width: number, hei
 
   const cx = width / 2;
   const cy = height / 2 + 40;
-  const pulse = 220 + rc.frame.avgVolume * 160 + rc.frame.beat * 60;
+  const pulse = 200 + rc.frame.avgVolume * 90 + rc.frame.beat * 35;
 
   const glow = ctx.createRadialGradient(cx, cy, 10, cx, cy, pulse);
-  glow.addColorStop(0, c.primaryGlow.replace('0.9', '0.28'));
-  glow.addColorStop(0.6, c.secondaryGlow.replace('0.5', '0.12'));
+  glow.addColorStop(0, c.primaryGlow.replace('0.9', '0.18'));
+  glow.addColorStop(0.6, c.secondaryGlow.replace('0.5', '0.08'));
   glow.addColorStop(1, 'transparent');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
@@ -40,6 +40,28 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// Sample a multi-stop gradient at t in [0,1] by linear interpolation between
+// adjacent stops. Used for angular/radial color mapping across the ring.
+export function sampleGradient(stops: string[], t: number): string {
+  const n = stops.length;
+  if (n === 0) return '#ffffff';
+  if (n === 1) return stops[0];
+  const x = Math.max(0, Math.min(1, t)) * (n - 1);
+  const i = Math.floor(x);
+  const j = Math.min(n - 1, i + 1);
+  const f = x - i;
+  return lerpHex(stops[i], stops[j], f);
+}
+
+function lerpHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.replace('#', ''), 16);
+  const pb = parseInt(b.replace('#', ''), 16);
+  const r = Math.round(((pa >> 16) & 255) + t * (((pb >> 16) & 255) - ((pa >> 16) & 255)));
+  const g = Math.round(((pa >> 8) & 255) + t * (((pb >> 8) & 255) - ((pa >> 8) & 255)));
+  const bl = Math.round((pa & 255) + t * ((pb & 255) - (pa & 255)));
+  return `rgb(${r}, ${g}, ${bl})`;
+}
+
 // Vertical gradient from theme stops, cached per theme+height.
 export function getVerticalGradient(
   ctx: CanvasRenderingContext2D,
@@ -49,10 +71,10 @@ export function getVerticalGradient(
   y1: number
 ): CanvasGradient {
   const g = ctx.createLinearGradient(x, y0, x, y1);
-  const [c0, c1, c2] = theme.colors.gradient;
-  g.addColorStop(0, c0);
-  g.addColorStop(0.5, c1);
-  g.addColorStop(1, c2);
+  const stops = theme.colors.gradient;
+  for (let i = 0; i < stops.length; i++) {
+    g.addColorStop(i / Math.max(1, stops.length - 1), stops[i]);
+  }
   return g;
 }
 

@@ -1,4 +1,4 @@
-import { createBandRanges, reduceBands, BandRange } from './frequencyBands';
+import { createBandRanges, reduceBands, createPerceptualWeights, applyNoiseGate, BandRange } from './frequencyBands';
 import { BandSmoother, PeakTracker } from './smoothing';
 import { BeatDetector } from './beatDetector';
 
@@ -27,7 +27,7 @@ export const DEFAULT_ANALYZER_CONFIG: AnalyzerConfig = {
   smoothingReleaseRate: 4,
   peakFallPerSecond: 0.5,
   bassBands: 6,
-  beatTriggerFactor: 1.6,
+  beatTriggerFactor: 1.8,
 };
 
 // Owns per-run analysis state: band mapping, smoothing, peaks, beat, waveform
@@ -41,6 +41,7 @@ export class AudioAnalyzer {
 
   private ranges: BandRange[];
   private raw: Float32Array;
+  private weights: Float32Array;
   private smoother: BandSmoother;
   private peaks: PeakTracker;
   private beat: BeatDetector;
@@ -53,6 +54,7 @@ export class AudioAnalyzer {
     this.freqData = new Uint8Array(this.binCount);
     this.waveform = new Uint8Array(config.fftSize);
     this.raw = new Float32Array(config.bandCount);
+    this.weights = createPerceptualWeights(config.bandCount);
     this.smoother = new BandSmoother(config.bandCount, {
       attackRate: config.smoothingAttackRate,
       releaseRate: config.smoothingReleaseRate,
@@ -74,6 +76,8 @@ export class AudioAnalyzer {
     analyser.getByteFrequencyData(this.freqData);
     analyser.getByteTimeDomainData(this.waveform);
     reduceBands(this.freqData, this.ranges, this.raw);
+    for (let b = 0; b < this.raw.length; b++) this.raw[b] *= this.weights[b];
+    applyNoiseGate(this.raw, 0.012);
     const bands = this.smoother.update(this.raw, deltaSec);
     const peaks = this.peaks.update(bands, deltaSec);
     const beat = this.beat.update(bands, timeSec, deltaSec);

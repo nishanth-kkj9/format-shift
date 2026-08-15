@@ -1,8 +1,8 @@
 import { SpectrumTheme } from '../../types';
 
 export interface ThemeColors {
-  // main gradient stops for bars / waveform / particles
-  gradient: [string, string, string];
+  // gradient stops (hex), evenly spaced 0..1 — 4-5 stops for rich angular rings
+  gradient: string[];
   // glow tints (used for shadows / radial glow)
   primaryGlow: string;
   secondaryGlow: string;
@@ -26,9 +26,9 @@ export const VISUALIZER_THEMES: Record<SpectrumTheme, VisualizerTheme> = {
     id: 'neon-lime',
     label: '🟢 Neon Lime Reactor',
     colors: {
-      gradient: ['#ccff00', '#7dff3c', '#00e5c8'],
+      gradient: ['#e9ff00', '#a5ff3c', '#3fe06a', '#00d6b8', '#00a8ff'],
       primaryGlow: 'rgba(157, 255, 0, 0.9)',
-      secondaryGlow: 'rgba(0, 229, 200, 0.5)',
+      secondaryGlow: 'rgba(0, 200, 255, 0.5)',
       background: '#05080a',
       title: '#eaffdd',
       subtitle: '#8fcaa8',
@@ -39,7 +39,7 @@ export const VISUALIZER_THEMES: Record<SpectrumTheme, VisualizerTheme> = {
     id: 'indigo-violet',
     label: '🔮 Indigo & Violet',
     colors: {
-      gradient: ['#6366f1', '#a855f7', '#ec4899'],
+      gradient: ['#6366f1', '#8b5cf6', '#a855f7', '#ec4899'],
       primaryGlow: 'rgba(139, 92, 246, 0.9)',
       secondaryGlow: 'rgba(236, 72, 153, 0.5)',
       background: '#0a0916',
@@ -52,7 +52,7 @@ export const VISUALIZER_THEMES: Record<SpectrumTheme, VisualizerTheme> = {
     id: 'cyan-emerald',
     label: '💎 Cyan & Emerald',
     colors: {
-      gradient: ['#06b6d4', '#10b981', '#34d399'],
+      gradient: ['#06b6d4', '#10b981', '#34d399', '#a7f3d0'],
       primaryGlow: 'rgba(6, 182, 212, 0.9)',
       secondaryGlow: 'rgba(16, 185, 129, 0.5)',
       background: '#04100e',
@@ -65,7 +65,7 @@ export const VISUALIZER_THEMES: Record<SpectrumTheme, VisualizerTheme> = {
     id: 'sunset-fire',
     label: '🔥 Sunset Fire',
     colors: {
-      gradient: ['#f97316', '#ef4444', '#f43f5e'],
+      gradient: ['#fbbf24', '#f97316', '#ef4444', '#f43f5e'],
       primaryGlow: 'rgba(249, 115, 22, 0.9)',
       secondaryGlow: 'rgba(244, 63, 94, 0.5)',
       background: '#0d0605',
@@ -78,7 +78,7 @@ export const VISUALIZER_THEMES: Record<SpectrumTheme, VisualizerTheme> = {
     id: 'matrix-green',
     label: '⚡ Matrix Cyber Green',
     colors: {
-      gradient: ['#22c55e', '#10b981', '#84cc16'],
+      gradient: ['#22c55e', '#10b981', '#84cc16', '#86efac'],
       primaryGlow: 'rgba(34, 197, 94, 0.9)',
       secondaryGlow: 'rgba(132, 204, 22, 0.5)',
       background: '#030c05',
@@ -91,7 +91,7 @@ export const VISUALIZER_THEMES: Record<SpectrumTheme, VisualizerTheme> = {
     id: 'aurora',
     label: '🌌 Aurora Borealis',
     colors: {
-      gradient: ['#22d3ee', '#818cf8', '#c084fc'],
+      gradient: ['#22d3ee', '#818cf8', '#c084fc', '#34d399'],
       primaryGlow: 'rgba(129, 140, 248, 0.9)',
       secondaryGlow: 'rgba(192, 132, 252, 0.5)',
       background: '#05060f',

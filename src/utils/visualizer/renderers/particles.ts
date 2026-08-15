@@ -1,4 +1,4 @@
-import { RenderContext, TAU, hexToRgba } from './shared';
+import { RenderContext, TAU, hexToRgba, sampleGradient } from './shared';
 
 interface Particle {
   x: number;
@@ -6,38 +6,42 @@ interface Particle {
   vx: number;
   vy: number;
   size: number;
-  hueIndex: number;
-  life: number; // 0..1 remaining
+  phase: number; // stable per-particle drift phase
+  seed: number; // stable per-particle randomness
+  gradT: number; // stable position in the theme gradient
+  alpha: number; // 0..1 base alpha
 }
 
 export interface ParticlesGeometry {
   particles: Particle[];
   count: number;
-  emitRate: number;
 }
 
-function rand(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
+// Persistent particle pool — positions/velocities evolve each frame; never
+// recreated per render tick. Audio only nudges velocity/brightness.
 export function createParticlesGeometry(width: number, height: number): ParticlesGeometry {
-  const count = 140;
+  const count = 130;
   const particles: Particle[] = [];
   for (let i = 0; i < count; i++) {
-    particles.push({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: rand(-12, 12),
-      vy: rand(20, 80),
-      size: rand(1.5, 4.5),
-      hueIndex: Math.floor(Math.random() * 3),
-      life: Math.random(),
-    });
+    particles.push(spawn(width, height, Math.random(), Math.random() * 2 - 1));
   }
-  return { particles, count, emitRate: 0.6 };
+  return { particles, count };
 }
 
-// Rising embers whose speed scales with overall volume and bass.
+function spawn(width: number, height: number, lifeSeed: number, side: number): Particle {
+  return {
+    x: Math.random() * width,
+    y: height * (0.3 + 0.7 * lifeSeed),
+    vx: side * (8 + Math.random() * 14),
+    vy: 30 + Math.random() * 45,
+    size: 1.6 + Math.random() * 2.8,
+    phase: Math.random() * TAU,
+    seed: Math.random(),
+    gradT: Math.random(),
+    alpha: 0.35 + Math.random() * 0.45,
+  };
+}
+
 export function renderParticles(
   ctx: CanvasRenderingContext2D,
   g: ParticlesGeometry,
@@ -46,36 +50,35 @@ export function renderParticles(
 ): void {
   const c = rc.theme.colors;
   const { frame } = rc;
-  const speedScale = 1 + frame.avgVolume * 2.2 + frame.beat * 2.5;
-  const spawnRate = g.emitRate + frame.avgVolume * 2;
+  // audio influence: slow rise + beat impulse, bounded so it stays atmospheric
+  const impulse = frame.beat;
+  const bass = frame.bands[0] ?? 0;
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.shadowColor = c.primaryGlow;
 
   for (let i = 0; i < g.particles.length; i++) {
     const p = g.particles[i];
-    p.life -= deltaSec * 0.25;
-    if (p.life <= 0) {
-      p.life = 1;
-      p.x = Math.random() * rc.width;
-      p.y = rc.height + rand(0, 40);
-      p.vx = rand(-12, 12);
-      p.vy = rand(24, 90);
-      p.size = rand(1.5, 4.5);
-      p.hueIndex = Math.floor(Math.random() * 3);
-    }
-    p.x += p.vx * speedScale * deltaSec;
-    p.y -= p.vy * speedScale * deltaSec;
 
-    if (Math.random() < spawnRate * deltaSec) {
-      p.x += rand(-30, 30);
-      p.y -= rand(0, 60);
+    // respawn when drifting off the top
+    if (p.y < -20) {
+      const fresh = spawn(rc.width, rc.height, Math.random(), Math.random() * 2 - 1);
+      fresh.x = Math.random() * rc.width;
+      fresh.y = rc.height + Math.random() * 20;
+      g.particles[i] = fresh;
+      continue;
     }
 
-    const alpha = Math.min(0.85, p.life * (0.25 + frame.bands[(p.hueIndex * 9) % Math.max(1, frame.bands.length)] * 0.75));
-    ctx.fillStyle = hexToRgba(c.gradient[p.hueIndex], alpha);
-    ctx.shadowBlur = p.size * 4;
+    // drift: gentle sine sway + steady rise, sped up by bass, pulsed by beat
+    const sway = Math.sin(rc.time * 0.8 + p.phase) * 0.6;
+    p.x += (p.vx * 0.4 + sway + (p.seed - 0.5) * impulse * 60) * deltaSec;
+    p.y -= (p.vy * (0.6 + bass * 0.8 + impulse * 1.6)) * deltaSec;
+
+    const brightness = p.alpha * (0.55 + bass * 0.6 + impulse * 0.5);
+    const color = sampleGradient(c.gradient, p.gradT);
+    ctx.fillStyle = hexToRgba(color, Math.min(0.9, brightness));
+    ctx.shadowColor = color;
+    ctx.shadowBlur = p.size * 2.2;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size, 0, TAU);
     ctx.fill();

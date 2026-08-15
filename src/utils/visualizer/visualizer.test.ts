@@ -98,7 +98,7 @@ describe('themes', () => {
     expect(ids.length).toBeGreaterThanOrEqual(5);
     for (const id of ids) {
       const t = VISUALIZER_THEMES[id as keyof typeof VISUALIZER_THEMES];
-      expect(t.colors.gradient).toHaveLength(3);
+      expect(t.colors.gradient.length).toBeGreaterThanOrEqual(4);
       expect(t.colors.gradient[0]).toMatch(/^#/);
       expect(t.colors.primaryGlow).toMatch(/^rgba\(/);
       expect(t.colors.background).toMatch(/^#/);

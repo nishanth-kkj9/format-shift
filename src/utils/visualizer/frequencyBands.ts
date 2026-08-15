@@ -41,3 +41,25 @@ export function reduceBands(
     out[b] = sum / (end - start + 1) / 255;
   }
 }
+
+// Perceptual weighting curve applied after band reduction:
+//   bass  -> 1.25  (strong visual kick, controlled)
+//   low-mid -> ~1.05
+//   treble -> 0.72 (detailed but damped so tiny high-freq noise stays quiet)
+// Uses a smooth monotonic falloff; never amplifies past a safe ceiling.
+export function createPerceptualWeights(bandCount: number): Float32Array {
+  const weights = new Float32Array(bandCount);
+  for (let b = 0; b < bandCount; b++) {
+    const t = bandCount > 1 ? b / (bandCount - 1) : 0;
+    weights[b] = 1.25 - 0.3 * t - 0.23 * t * t;
+  }
+  return weights;
+}
+
+// Soft noise gate: zero out near-silent bands so quiet passages stay quiet
+// and treble hiss doesn't create visual activity.
+export function applyNoiseGate(bands: Float32Array, floor: number): void {
+  for (let b = 0; b < bands.length; b++) {
+    if (bands[b] < floor) bands[b] = 0;
+  }
+}

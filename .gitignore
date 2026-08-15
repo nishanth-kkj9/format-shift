@@ -7,5 +7,7 @@ coverage/
 *.err
 graphify-out/
 plans/
+probe/out/
+probe/audio/
 .env*
 !.env.example

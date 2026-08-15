@@ -8,10 +8,10 @@ export interface BeatConfig {
 
 export const DEFAULT_BEAT_CONFIG: BeatConfig = {
   bassBands: 6,
-  energyAttack: 0.05,
-  triggerFactor: 1.6,
-  minThreshold: 0.18,
-  decayPerSecond: 4.5,
+  energyAttack: 0.04,
+  triggerFactor: 1.8,
+  minThreshold: 0.16,
+  decayPerSecond: 3.2,
 };
 
 // Bass-energy impulse detector. Emits a 0..1 decaying pulse on downbeats.
