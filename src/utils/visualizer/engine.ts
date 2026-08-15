@@ -1,7 +1,7 @@
 import { AudioConversionOptions, SpectrumStyle, TargetFormat } from '../../types';
 import { AudioAnalyzer, DEFAULT_ANALYZER_CONFIG } from './audioAnalyzer';
 import { getTheme } from './themes';
-import { drawBackground, createHudGeometry, drawHud, RenderContext } from './renderers/shared';
+import { drawBackground, RenderContext } from './renderers/shared';
 import { createBarsGeometry, renderBars } from './renderers/bars';
 import { renderWaveform } from './renderers/waveform';
 import { createRadialGeometry, renderRadial } from './renderers/radial';
@@ -149,8 +149,6 @@ export async function renderSpectrumVideo(
   const analyzer = new AudioAnalyzer();
   const style: SpectrumStyle = options.spectrumStyle || 'bars';
   const theme = getTheme(options.spectrumTheme);
-  const title = file.name.replace(/\.[^/.]+$/, '');
-  const hud = createHudGeometry(SPECTRUM_WIDTH);
   const barsGeom = createBarsGeometry(SPECTRUM_WIDTH, SPECTRUM_HEIGHT, analyzer.bandCount);
   const radialGeom = createRadialGeometry(SPECTRUM_WIDTH, SPECTRUM_HEIGHT, analyzer.bandCount);
   const particlesGeom = createParticlesGeometry(SPECTRUM_WIDTH, SPECTRUM_HEIGHT);
@@ -289,7 +287,6 @@ export async function renderSpectrumVideo(
           renderParticles(ctx, particlesGeom, rc, deltaSec);
           break;
       }
-      drawHud(ctx, hud, rc, title);
     };
 
     renderTimer = setInterval(render, FRAME_MS);

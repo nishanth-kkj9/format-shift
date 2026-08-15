@@ -35,6 +35,7 @@ const themeName = params.get('theme') || 'neon-lime';
 const audioName = params.get('audio') || 'mixed';
 const mode = params.get('mode') || 'recording';
 const volume = Number(params.get('volume') || '100');
+const showHud = params.get('hud') === '1';
 
 const W = SPECTRUM_WIDTH;
 const H = SPECTRUM_HEIGHT;
@@ -135,7 +136,7 @@ async function init(): Promise<void> {
         renderRadial(ctx, radialGeom, rc);
         break;
     }
-    drawHud(ctx, hud, rc, `probe ${style} · ${themeName}`);
+    if (showHud) drawHud(ctx, hud, rc, `probe ${style} · ${themeName}`);
     return true;
   };
 
