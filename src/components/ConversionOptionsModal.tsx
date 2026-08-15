@@ -8,6 +8,8 @@ import {
   VideoConversionOptions,
   DataConversionOptions,
   SocialMediaPreset,
+  SpectrumStyle,
+  SpectrumTheme,
 } from '../types';
 import { SOCIAL_PRESETS } from '../utils/converter';
 
@@ -46,7 +48,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
       volume: 100,
       spectrumVisualizer: false,
       spectrumStyle: 'bars',
-      spectrumTheme: 'indigo-violet',
+      spectrumTheme: 'neon-lime',
     }
   );
 
@@ -384,7 +386,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             onChange={(e) =>
                               setAudioOpts({
                                 ...audioOpts,
-                                spectrumStyle: e.target.value as 'bars' | 'wave' | 'radial',
+                                spectrumStyle: e.target.value as SpectrumStyle,
                               })
                             }
                             className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-950 border border-indigo-500/40 text-white cursor-pointer"
@@ -392,6 +394,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             <option value="bars">📊 Frequency Equalizer Bars</option>
                             <option value="wave">〰️ Oscilloscope Waveform</option>
                             <option value="radial">⭕ Radial Soundwave Ring</option>
+                            <option value="particles">✨ Reactive Particle Field</option>
                           </select>
                         </div>
 
@@ -400,23 +403,21 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             Color Theme
                           </label>
                           <select
-                            value={audioOpts.spectrumTheme || 'indigo-violet'}
+                            value={audioOpts.spectrumTheme || 'neon-lime'}
                             onChange={(e) =>
                               setAudioOpts({
                                 ...audioOpts,
-                                spectrumTheme: e.target.value as
-                                  | 'indigo-violet'
-                                  | 'cyan-emerald'
-                                  | 'sunset-fire'
-                                  | 'matrix-green',
+                                spectrumTheme: e.target.value as SpectrumTheme,
                               })
                             }
                             className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-950 border border-indigo-500/40 text-white cursor-pointer"
                           >
+                            <option value="neon-lime">🟢 Neon Lime Reactor</option>
                             <option value="indigo-violet">🔮 Indigo & Violet</option>
                             <option value="cyan-emerald">💎 Cyan & Emerald</option>
                             <option value="sunset-fire">🔥 Sunset Fire</option>
                             <option value="matrix-green">⚡ Matrix Cyber Green</option>
+                            <option value="aurora">🌌 Aurora Borealis</option>
                           </select>
                         </div>
                       </div>
