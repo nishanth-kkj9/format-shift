@@ -3,6 +3,7 @@ import { createBandRanges, reduceBands } from './frequencyBands';
 import { BandSmoother, PeakTracker } from './smoothing';
 import { BeatDetector } from './beatDetector';
 import { AudioAnalyzer } from './audioAnalyzer';
+import { computeTrimRange } from './engine';
 import { VISUALIZER_THEMES, getTheme } from './themes';
 
 describe('frequencyBands', () => {
@@ -63,6 +64,29 @@ describe('PeakTracker', () => {
   });
 });
 
+describe('computeTrimRange', () => {
+  it('defaults to the full file when no trim given', () => {
+    expect(computeTrimRange(10, undefined, undefined)).toEqual({ start: 0, end: 10 });
+  });
+
+  it('clamps out-of-range trim values to the duration', () => {
+    expect(computeTrimRange(10, -5, 100)).toEqual({ start: 0, end: 10 });
+  });
+
+  it('honors a valid inner range', () => {
+    expect(computeTrimRange(10, 2, 8)).toEqual({ start: 2, end: 8 });
+  });
+
+  it('falls back to the whole file when start >= end', () => {
+    expect(computeTrimRange(10, 8, 3)).toEqual({ start: 0, end: 10 });
+    expect(computeTrimRange(10, 5, 5)).toEqual({ start: 0, end: 10 });
+  });
+
+  it('tolerates zero duration', () => {
+    expect(computeTrimRange(0, 0, 0)).toEqual({ start: 0, end: 0 });
+  });
+});
+
 describe('BeatDetector', () => {
   it('emits a pulse on strong bass then decays', () => {
     const d = new BeatDetector();
@@ -73,6 +97,29 @@ describe('BeatDetector', () => {
     expect(pulse).toBeGreaterThan(0.5);
     const decayed = d.update(quiet, 2, 1);
     expect(decayed).toBeLessThan(pulse);
+  });
+
+  it('does not re-trigger within the cooldown window', () => {
+    const d = new BeatDetector();
+    const loud = new Float32Array([0.9, 0.9, 0.9, 0.9, 0.9, 0.9]);
+    // prime energy low
+    for (let i = 0; i < 20; i++) d.update(new Float32Array([0.05, 0.05, 0.05, 0.05, 0.05, 0.05]), i * 0.1, 0.1);
+    const t1 = d.update(loud, 2, 0.1); // fires
+    const t2 = d.update(loud, 2.05, 0.1); // within cooldown -> no reset
+    expect(t1).toBeGreaterThan(0.5);
+    expect(t2).toBeLessThanOrEqual(t1);
+  });
+
+  it('stops firing once running energy settles on sustained bass', () => {
+    const d = new BeatDetector();
+    const mod = new Float32Array([0.3, 0.3, 0.3, 0.3, 0.3, 0.3]);
+    const pulses = [];
+    for (let i = 0; i < 300; i++) pulses.push(d.update(mod, i * 0.05, 0.05));
+    // energy (attack 0.04) converges to ~0.3 within ~100 frames; once settled,
+    // sustained bass (0.3) no longer exceeds energy * 1.8.
+    const settledWindow = pulses.slice(150);
+    const spikes = settledWindow.filter((p) => p > 0.9).length;
+    expect(spikes).toBe(0);
   });
 });
 
@@ -89,6 +136,20 @@ describe('AudioAnalyzer', () => {
     const a = new AudioAnalyzer();
     a.reset();
     expect(Array.from(a.freqData)).toHaveLength(1024);
+  });
+
+  it('clamps weighted bands to 0..1 even when weights push above 1', () => {
+    const a = new AudioAnalyzer();
+    const fakeAnalyser = {
+      getByteFrequencyData: (arr: Uint8Array) => arr.fill(255), // full scale
+      getByteTimeDomainData: (arr: Uint8Array) => arr.fill(128),
+    } as unknown as AnalyserNode;
+    const frame = a.analyze(fakeAnalyser, 1, 1 / 30);
+    for (const v of frame.bands) {
+      expect(v).toBeLessThanOrEqual(1.0001);
+      expect(v).toBeGreaterThanOrEqual(0);
+    }
+    expect(frame.avgVolume).toBeLessThanOrEqual(1);
   });
 });
 

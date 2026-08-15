@@ -9,5 +9,8 @@ graphify-out/
 plans/
 probe/out/
 probe/audio/
+test-1s.mp4
+test-1s.png
+test-2s.wav
 .env*
 !.env.example

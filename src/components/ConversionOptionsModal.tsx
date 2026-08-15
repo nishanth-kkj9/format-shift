@@ -444,6 +444,15 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         </button>
                       ))}
                     </div>
+                    {(audioOpts.spectrumVisualizer ||
+                      item.targetFormat === 'mp4' ||
+                      item.targetFormat === 'webm') && (
+                      <p className="text-[11px] text-slate-300/80 leading-relaxed">
+                        Spectrum video output encodes audio with the browser's native
+                        codec (bitrate/sample rate are set by the browser, not this
+                        control).
+                      </p>
+                    )}
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">

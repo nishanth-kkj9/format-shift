@@ -77,7 +77,7 @@ for (const file of files) {
     // ring detection: sample at radius r from center, find band with max
     // saturated pixel density (dots). cx,cy ~ center.
     const cx = width / 2;
-    const cy = height / 2 + 30;
+    const cy = height / 2;
     let bestR = 0;
     let bestDensity = 0;
     const densities = [];
@@ -160,6 +160,26 @@ for (const r of results) {
   console.log(`  ring r=${r.bestR} density=${(r.bestDensity * 100).toFixed(0)}%`);
   console.log(`  sectors: ${sector}`);
   console.log(`  hues: ${hue}`);
+}
+
+// Aggregate: ring radius stability + frame-to-frame change (same combo batch).
+// Ring radius variance is the key visualizer-regression signal — per-dot FFT
+// jumps show up as high variance; a stable circle stays within a few px.
+if (results.length > 1) {
+  const radii = results.map((r) => r.bestR);
+  const mean = radii.reduce((s, v) => s + v, 0) / radii.length;
+  const variance = radii.reduce((s, v) => s + (v - mean) ** 2, 0) / radii.length;
+  const drift = Math.max(...radii) - Math.min(...radii);
+  console.log(`\n== BATCH AGGREGATE (${results.length} frames)`);
+  console.log(`  ring r: mean=${mean.toFixed(1)} min=${Math.min(...radii)} max=${Math.max(...radii)} drift=${drift} var=${variance.toFixed(2)}`);
+  const peaks = results.map((r) => r.maxLum);
+  console.log(`  maxLum: min=${Math.min(...peaks)} max=${Math.max(...peaks)}`);
+  const sectors = results.map((r) => r.sectorLum);
+  const dominant = sectors.map((s) => {
+    const mx = Math.max(...s);
+    return s.indexOf(mx);
+  });
+  console.log(`  dominant arc sector per frame: ${dominant.map((d) => d * 45).join(', ')}°`);
 }
 
 await browser.close();

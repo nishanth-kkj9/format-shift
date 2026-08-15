@@ -1,8 +1,18 @@
 // Probe harness (dev-only, not shipped): drives the REAL visualizer modules
 // (analyzer + renderers) with real decoded audio and exposes frame snapshots.
-// Served over Vite so TS transforms natively. Query: ?style=&theme=&audio=
+// Served over Vite so TS transforms natively. Query:
+//   ?style=&theme=&audio=&mode=recording|preview&volume=100
+// mode=recording (default) uses the exact fixed FRAME_MS tick of production;
+// mode=preview uses requestAnimationFrame for smooth live preview.
 import { AudioAnalyzer, DEFAULT_ANALYZER_CONFIG } from '../src/utils/visualizer/audioAnalyzer';
 import { getTheme } from '../src/utils/visualizer/themes';
+import {
+  SPECTRUM_WIDTH,
+  SPECTRUM_HEIGHT,
+  SPECTRUM_FPS,
+  FRAME_MS,
+  MAX_FRAME_MS,
+} from '../src/utils/visualizer/engine';
 import {
   drawBackground,
   createHudGeometry,
@@ -23,9 +33,11 @@ const params = new URLSearchParams(location.search);
 const style = params.get('style') || 'radial';
 const themeName = params.get('theme') || 'neon-lime';
 const audioName = params.get('audio') || 'mixed';
+const mode = params.get('mode') || 'recording';
+const volume = Number(params.get('volume') || '100');
 
-const W = 1280;
-const H = 720;
+const W = SPECTRUM_WIDTH;
+const H = SPECTRUM_HEIGHT;
 
 const canvas = document.createElement('canvas');
 canvas.width = W;
@@ -40,7 +52,7 @@ document.body.prepend(canvas);
 const ctx = canvas.getContext('2d')!;
 
 async function init(): Promise<void> {
-  log(`style=${style} theme=${themeName} audio=${audioName}`);
+  log(`style=${style} theme=${themeName} audio=${audioName} mode=${mode} volume=${volume}`);
   const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
   const audioCtx = new AudioCtx();
   await audioCtx.resume();
@@ -51,12 +63,17 @@ async function init(): Promise<void> {
   const decoded = await audioCtx.decodeAudioData(buf);
   log(`decoded ${decoded.duration.toFixed(2)}s`);
 
+  // Mirrors production signal path: source --gain--> analyser.
+  // (probe taps the analyser instead of a MediaStreamDestination.)
   const source = audioCtx.createBufferSource();
   source.buffer = decoded;
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = volume / 100;
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = DEFAULT_ANALYZER_CONFIG.fftSize;
   analyser.smoothingTimeConstant = 0;
-  source.connect(analyser);
+  source.connect(gainNode);
+  gainNode.connect(analyser);
   analyser.connect(audioCtx.destination);
 
   const analyzer = new AudioAnalyzer();
@@ -70,15 +87,25 @@ async function init(): Promise<void> {
   const startWall = performance.now();
   let lastFrame = startWall;
 
-  const render = () => {
-    const now = performance.now();
+  const finish = () => {
+    log(`DONE elapsed=${((performance.now() - startWall) / 1000).toFixed(2)}`);
+    try {
+      source.stop();
+    } catch {
+      /* already stopped */
+    }
+    audioCtx.close().catch(() => undefined);
+    (window as any).__done = true;
+  };
+
+  const renderFrame = (now: number) => {
     const elapsedSec = (now - startWall) / 1000;
-    const deltaSec = Math.min(0.05, (now - lastFrame) / 1000);
+    const deltaSec = Math.min(MAX_FRAME_MS, now - lastFrame) / 1000;
     lastFrame = now;
 
     if (elapsedSec >= decoded.duration) {
-      log(`DONE elapsed=${elapsedSec.toFixed(2)}`);
-      return;
+      finish();
+      return false;
     }
 
     const frame = analyzer.analyze(analyser, elapsedSec, deltaSec);
@@ -109,11 +136,22 @@ async function init(): Promise<void> {
         break;
     }
     drawHud(ctx, hud, rc, `probe ${style} · ${themeName}`);
-
-    requestAnimationFrame(render);
+    return true;
   };
 
-  requestAnimationFrame(render);
+  if (mode === 'recording') {
+    // Production-equivalent fixed tick (setInterval like engine.render loop).
+    log(`recording mode: ${SPECTRUM_FPS}fps (FRAME_MS=${FRAME_MS})`);
+    const timer = window.setInterval(() => {
+      const cont = renderFrame(performance.now());
+      if (!cont) window.clearInterval(timer);
+    }, FRAME_MS);
+  } else {
+    const loop = (now: number) => {
+      if (renderFrame(now)) requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
 
   // Snapshot hook for the Playwright driver.
   (window as any).__snapshot = () => canvas.toDataURL('image/png');

@@ -33,9 +33,10 @@ export interface RadialGeometry {
 export const DEFAULT_RADIAL_CONFIG: RadialConfig = {
   dotCount: 88,
   baseRadius: 210,
-  // Lower-left arc: canvas angles 90° (bottom) -> 180° (left), center ~135°.
+  // Lower-left arc: canvas angles 90° (bottom) -> 200°, center ~145°. Slightly
+  // wider than 90° so 48 bars breathe without merging.
   arcStartAngle: Math.PI * 0.5,
-  arcSpan: Math.PI * 0.5,
+  arcSpan: Math.PI * 0.61,
   barMaxLen: 140,
   barMinLen: 12,
   barWidth: 8,
@@ -51,8 +52,10 @@ export function createRadialGeometry(
   bandCount: number,
   config: RadialConfig = DEFAULT_RADIAL_CONFIG
 ): RadialGeometry {
+  // Center near the middle but raised slightly so the lower-left arc + bars
+  // (radius 210 + up to 140px outward) never clip past the 720px frame bottom.
   const centerX = width / 2;
-  const centerY = height / 2 + 30;
+  const centerY = height / 2;
   const dotAngles = new Float32Array(config.dotCount);
   for (let i = 0; i < config.dotCount; i++) dotAngles[i] = (i / config.dotCount) * TAU;
 
@@ -112,8 +115,9 @@ function strokeBar(
 }
 
 // Dotted glowing ring (angular multi-color gradient) + rounded neon bars on an
-// asymmetric left/lower-left arc. Ring stays a recognizable circle with only
-// subtle amplitude + beat response.
+// asymmetric left/lower-left arc. Ring radius moves with OVERALL energy
+// (avgVolume) rather than individual FFT bands, so the ring stays a stable,
+// recognizable circle — bars carry the per-band audio movement.
 export function renderRadial(ctx: CanvasRenderingContext2D, g: RadialGeometry, rc: RenderContext): void {
   const { frame, theme, time } = rc;
   const c = theme.colors;
@@ -124,6 +128,7 @@ export function renderRadial(ctx: CanvasRenderingContext2D, g: RadialGeometry, r
   const ringR = cfg.baseRadius * pulse;
   const cx = g.centerX;
   const cy = g.centerY;
+  const vol = frame.avgVolume;
 
   ctx.save();
   ctx.lineCap = 'round';
@@ -146,16 +151,18 @@ export function renderRadial(ctx: CanvasRenderingContext2D, g: RadialGeometry, r
   }
 
   // --- Dotted ring with angular color gradient ---
+  // Radius follows overall volume + beat uniformly (subtle); dot size has a
+  // small per-dot variation for texture but never teleports with one band.
   const gradientStops = c.gradient;
+  const ringOffset = vol * cfg.dotAmpOffset;
+  const sizeRange = cfg.dotMaxR - cfg.dotMinR;
   for (let i = 0; i < cfg.dotCount; i++) {
     const angle = g.dotAngles[i];
-    // each dot maps to the bar band in its angular sector
-    const bandIdx = Math.min(n - 1, Math.floor((i / cfg.dotCount) * n));
-    const amp = bands[bandIdx] ?? 0;
-    const r = ringR + amp * cfg.dotAmpOffset;
+    const wobble = 0.5 + 0.5 * Math.sin(i * 2.7 + time * 0.4);
+    const r = ringR + ringOffset + wobble * 1.5;
     const x = cx + Math.cos(angle) * r;
     const y = cy + Math.sin(angle) * r;
-    const dotR = cfg.dotMinR + amp * (cfg.dotMaxR - cfg.dotMinR) + beat * 1.2;
+    const dotR = cfg.dotMinR + vol * sizeRange * 0.6 + beat * 1.2;
     const color = sampleGradient(gradientStops, i / cfg.dotCount);
 
     ctx.fillStyle = color;

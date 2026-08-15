@@ -72,15 +72,30 @@ export class AudioAnalyzer {
   }
 
   // Pulls a full frame of analysis. Call once per render tick.
+  //
+  // Signal contract (all band values are 0..1):
+  //   raw FFT (0..255)
+  //     -> reduceBands (0..1)
+  //     -> perceptual weighting
+  //     -> clamp to 0..1            <- weighting may exceed 1; never explode
+  //     -> noise gate
+  //     -> beat detector (raw bass, responsive)
+  //     -> smoother  (renderers)
+  //     -> peak tracker
   analyze(analyser: AnalyserNode, timeSec: number, deltaSec: number): FrameData {
     analyser.getByteFrequencyData(this.freqData);
     analyser.getByteTimeDomainData(this.waveform);
     reduceBands(this.freqData, this.ranges, this.raw);
-    for (let b = 0; b < this.raw.length; b++) this.raw[b] *= this.weights[b];
+    for (let b = 0; b < this.raw.length; b++) {
+      const w = this.raw[b] * this.weights[b];
+      this.raw[b] = w > 1 ? 1 : w; // clamp weighted energy back to 0..1
+    }
     applyNoiseGate(this.raw, 0.012);
+    // Beat detector sees the RAW weighted bass (pre-smoothing) so transients
+    // stay responsive; renderers see the smoothed bands.
+    const beat = this.beat.update(this.raw, timeSec, deltaSec);
     const bands = this.smoother.update(this.raw, deltaSec);
     const peaks = this.peaks.update(bands, deltaSec);
-    const beat = this.beat.update(bands, timeSec, deltaSec);
 
     let sum = 0;
     for (let i = 0; i < bands.length; i++) sum += bands[i];

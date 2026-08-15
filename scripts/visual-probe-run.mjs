@@ -1,13 +1,13 @@
 // Probe driver: runs the Vite dev server, opens the probe page per
 // style/theme/audio combo, and saves PNG snapshots to out/ for visual review.
-// Usage: node scripts/visual-probe-run.mjs [style] [theme] [audio] [outdir]
-// Example: node scripts/visual-probe-run.mjs radial neon-lime mixed
+// Usage: node scripts/visual-probe-run.mjs [style] [theme] [audio] [outdir] [mode]
+// Example: node scripts/visual-probe-run.mjs radial neon-lime mixed (recording mode)
 import { chromium } from 'playwright';
 import { createServer as createViteServer } from 'vite';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const [style, theme, audio, outdir] = process.argv.slice(2);
+const [style, theme, audio, outdir, mode] = process.argv.slice(2);
 const projectRoot = resolve(import.meta.dirname, '..');
 const outDir = resolve(outdir || join(projectRoot, 'probe/out'));
 
@@ -28,7 +28,7 @@ async function main() {
   await vite.listen();
 
   const port = vite.config.server.port || 5199;
-  const url = `http://localhost:${port}/probe/index.html?style=${style}&theme=${theme}&audio=${audio}`;
+  const url = `http://localhost:${port}/probe/index.html?style=${style}&theme=${theme}&audio=${audio}${mode ? `&mode=${mode}` : ''}`;
   console.log(`OPEN ${url}`);
 
   const browser = await chromium.launch({
