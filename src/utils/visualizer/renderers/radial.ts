@@ -33,12 +33,12 @@ export interface RadialGeometry {
 export const DEFAULT_RADIAL_CONFIG: RadialConfig = {
   dotCount: 88,
   baseRadius: 210,
-  // Lower-left arc: canvas angles 90° (bottom) -> 200°, center ~145°. Slightly
-  // wider than 90° so 48 bars breathe without merging.
+  // Lower-left arc: ~120° centered on lower-left. Wide enough for 48 bars to
+  // breathe without merging; narrow enough to keep the ring as the dominant shape.
   arcStartAngle: Math.PI * 0.5,
-  arcSpan: Math.PI * 0.61,
-  barMaxLen: 140,
-  barMinLen: 12,
+  arcSpan: Math.PI * 0.67,
+  barMaxLen: 100,
+  barMinLen: 6,
   barWidth: 8,
   dotMinR: 3,
   dotMaxR: 6.5,
