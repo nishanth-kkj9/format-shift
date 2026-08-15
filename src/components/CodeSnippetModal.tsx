@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Code2, Copy, Check } from 'lucide-react';
-import { CodeTemplateResponse } from '../types';
+import { CodeTemplateResponse, FileCategory } from '../types';
+import { CONVERSION_REGISTRY, getAvailableTargets } from '../core/conversionRegistry';
 
 interface CodeSnippetModalProps {
   isOpen: boolean;
@@ -23,6 +24,25 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [codeData, setCodeData] = useState<CodeTemplateResponse['code'] | null>(null);
 
+  // Local state for user-selectable conversion parameters
+  const [selCategory, setSelCategory] = useState<FileCategory>(category as FileCategory || 'image');
+  const [selSource, setSelSource] = useState(sourceFormat || 'png');
+  const [selTarget, setSelTarget] = useState(targetFormat || 'jpg');
+
+  // When the modal opens, sync local state with the props (which come from queue[0]).
+  useEffect(() => {
+    if (isOpen) {
+      setSelCategory((category as FileCategory) || 'image');
+      setSelSource(sourceFormat || 'png');
+      setSelTarget(targetFormat || 'jpg');
+    }
+  }, [isOpen, category, sourceFormat, targetFormat]);
+
+  // Available source formats for the selected category
+  const sourceOptions = CONVERSION_REGISTRY[selCategory]?.sourceFormats || [];
+  // Available target formats for the selected category
+  const targetOptions = getAvailableTargets(selCategory) || [];
+
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
@@ -30,7 +50,7 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
     fetch('/api/code-template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, sourceFormat, targetFormat }),
+      body: JSON.stringify({ category: selCategory, sourceFormat: selSource, targetFormat: selTarget }),
     })
       .then((res) => res.json())
       .then((data: CodeTemplateResponse) => {
@@ -40,13 +60,13 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
       .catch(() => {
         // Fallback local code templates
         setCodeData({
-          python: `# Python Code (PIL/Pillow)\nfrom PIL import Image\n\nimg = Image.open('input.${sourceFormat}')\nimg.save('output.${targetFormat}')`,
-          node: `// Node.js Code\nimport sharp from 'sharp';\n\nawait sharp('input.${sourceFormat}').toFile('output.${targetFormat}');`,
+          python: `# Python Code (PIL/Pillow)\nfrom PIL import Image\n\nimg = Image.open('input.${selSource}')\nimg.save('output.${selTarget}')`,
+          node: `// Node.js Code\nimport sharp from 'sharp';\n\nawait sharp('input.${selSource}').toFile('output.${selTarget}');`,
           html: `<!-- HTML5 + Canvas JS -->\n<script>\nconst canvas = document.createElement('canvas');\n</script>`,
         });
         setLoading(false);
       });
-  }, [isOpen, category, sourceFormat, targetFormat]);
+  }, [isOpen, selCategory, selSource, selTarget]);
 
   const currentCode = codeData ? codeData[activeTab] : '';
 
@@ -98,6 +118,54 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Conversion Parameter Selectors */}
+            <div className="px-6 py-3 border-b border-white/10 bg-slate-950/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Category</label>
+                <select
+                  value={selCategory}
+                  onChange={(e) => {
+                    const cat = e.target.value as FileCategory;
+                    setSelCategory(cat);
+                    // Reset source/target to sensible defaults for the new category
+                    const srcs = CONVERSION_REGISTRY[cat]?.sourceFormats || [];
+                    const tgts = getAvailableTargets(cat) || [];
+                    setSelSource(srcs[0] || 'png');
+                    setSelTarget(tgts[0] || 'jpg');
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
+                >
+                  {(['image', 'audio', 'video', 'data', 'document'] as FileCategory[]).map((c) => (
+                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source Format</label>
+                <select
+                  value={selSource}
+                  onChange={(e) => setSelSource(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
+                >
+                  {sourceOptions.map((f) => (
+                    <option key={f} value={f}>{f.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Target Format</label>
+                <select
+                  value={selTarget}
+                  onChange={(e) => setSelTarget(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
+                >
+                  {targetOptions.map((f) => (
+                    <option key={f} value={f}>{f.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Language Tabs & Copy Action */}

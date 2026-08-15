@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
+import ffmpegPath from "ffmpeg-static";
 import { convertRouter } from "./server/routes/convert";
 import { templatesRouter } from "./server/routes/templates";
 
@@ -21,9 +22,24 @@ const apiLimiter = rateLimit({
 });
 app.use("/api/convert", apiLimiter);
 
+// Simple request logger (no external dependency)
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`);
+  });
+  next();
+});
+
 // API endpoints
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", app: "FormatShift Universal Converter", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    app: "FormatShift Universal Converter",
+    timestamp: new Date().toISOString(),
+    ffmpeg: ffmpegPath ? "available" : "missing",
+  });
 });
 
 app.use("/api/convert", convertRouter);

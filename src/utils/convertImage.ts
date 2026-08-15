@@ -11,6 +11,10 @@ const TARGET_MIME: Record<string, string> = {
   svg: 'image/svg+xml',
 };
 
+// Targets that must run on the FFmpeg server — the browser canvas cannot
+// reliably encode these. Rejecting here prevents silently mislabeled output.
+const SERVER_ONLY_IMAGE_TARGETS = new Set(['gif', 'bmp', 'ico', 'avif']);
+
 function assertBlobMatches(blob: Blob | null, target: string): void {
   const expected = TARGET_MIME[target];
   if (!blob) {
@@ -40,6 +44,11 @@ export async function convertImage(
   options: ImageConversionOptions,
   onProgress?: (pct: number) => void
 ): Promise<{ blob: Blob; dimensions: { width: number; height: number } }> {
+  const tgt = targetFormat.toLowerCase();
+  // Fail loudly for server-only targets instead of producing a mislabeled blob.
+  if (SERVER_ONLY_IMAGE_TARGETS.has(tgt)) {
+    throw new Error(`Image -> ${targetFormat} must run on the FFmpeg server`);
+  }
   onProgress?.(10);
 
   return new Promise((resolve, reject) => {

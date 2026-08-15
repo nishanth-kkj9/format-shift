@@ -1,7 +1,8 @@
 import React from 'react';
 import { Play, Download, Trash2, CheckCircle2, Loader2, FolderArchive, Sparkles } from 'lucide-react';
-import { ConversionItem, TargetFormat } from '../types';
+import { ConversionItem, TargetFormat, FileCategory } from '../types';
 import { formatBytes } from '../utils/converter';
+import { getAvailableTargets } from '../core/conversionRegistry';
 
 interface BatchBarProps {
   items: ConversionItem[];
@@ -50,27 +51,24 @@ export const BatchBar: React.FC<BatchBarProps> = ({
             </div>
           </div>
 
-          {/* Quick Global Format Selector Dropdown */}
+          {/* Quick Global Format Selector Dropdown — derived from the registry */}
           <select
             onChange={(e) => e.target.value && onApplyGlobalFormat(e.target.value as TargetFormat)}
             defaultValue=""
             className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-900/90 text-indigo-300 border border-indigo-500/40 focus:ring-2 focus:ring-indigo-500 cursor-pointer uppercase shadow-inner"
           >
             <option value="" disabled>Set All Formats...</option>
-            <optgroup label="Images">
-              <option value="png">All to .PNG</option>
-              <option value="jpg">All to .JPG</option>
-              <option value="webp">All to .WEBP</option>
-              <option value="ico">All to .ICO</option>
-            </optgroup>
-            <optgroup label="Audio">
-              <option value="mp3">All to .MP3</option>
-              <option value="wav">All to .WAV</option>
-            </optgroup>
-            <optgroup label="Data">
-              <option value="json">All to .JSON</option>
-              <option value="csv">All to .CSV</option>
-            </optgroup>
+            {(['image', 'audio', 'video', 'data', 'document'] as FileCategory[]).map((cat) => {
+              const targets = getAvailableTargets(cat);
+              if (targets.length === 0) return null;
+              return (
+                <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
+                  {targets.map((fmt) => (
+                    <option key={fmt} value={fmt}>All to .{fmt.toUpperCase()}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </div>
 

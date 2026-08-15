@@ -62,8 +62,10 @@ export async function convertDataDocument(
       }
     }
   } catch (err) {
-    // Fallback: output plain text
-    resultText = text;
+    // Surface conversion errors instead of silently returning the input text.
+    // A silent fallback hides real bugs (e.g. malformed JSON, unsupported nesting).
+    const message = err instanceof Error ? err.message : 'Data conversion failed';
+    throw new Error(`Failed to convert to ${targetFormat}: ${message}`);
   }
 
   onProgress?.(90);

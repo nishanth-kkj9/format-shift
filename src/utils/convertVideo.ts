@@ -28,7 +28,10 @@ export async function convertVideo(
     video.muted = options.muteAudio;
     video.src = videoUrl;
 
-    video.onerror = () => reject(new Error('Unable to load video file'));
+    video.onerror = () => {
+      URL.revokeObjectURL(videoUrl);
+      reject(new Error('Unable to load video file'));
+    };
 
     video.onloadedmetadata = () => {
       onProgress?.(30);

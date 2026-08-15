@@ -18,14 +18,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   onDownload,
 }) => {
   const [sliderPos, setSliderPos] = useState(50);
-
-  if (!item) return null;
+  const [convertedText, setConvertedText] = useState<string>('');
 
   const originalUrl = useMemo(
-    () => item.previewUrl || URL.createObjectURL(item.file),
-    [item.previewUrl, item.file]
+    () => item?.previewUrl || (item ? URL.createObjectURL(item.file) : ''),
+    [item?.previewUrl, item?.file]
   );
-  const convertedUrl = item.convertedUrl || '';
+  const convertedUrl = item?.convertedUrl || '';
 
   // Clean up object URLs when component unmounts or item changes
   useEffect(() => {
@@ -37,6 +36,17 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       // Do NOT revoke convertedUrl — it's owned by App.tsx and used by history
     };
   }, [item, originalUrl]);
+
+  // Read the converted blob text for data/document previews
+  useEffect(() => {
+    if (item && (item.category === 'data' || item.category === 'document') && item.convertedBlob) {
+      item.convertedBlob.text().then(setConvertedText).catch(() => setConvertedText(''));
+    } else {
+      setConvertedText('');
+    }
+  }, [item?.category, item?.convertedBlob]);
+
+  if (!item) return null;
 
   const sizeDiff = item.convertedSize ? item.convertedSize - item.originalSize : 0;
   const pctSaved = item.convertedSize
@@ -226,7 +236,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     <FileCode className="w-4 h-4 text-emerald-400" /> Converted Output Snippet
                   </div>
                   <div className="p-4 rounded-2xl border border-white/10 bg-slate-950 font-mono text-xs text-emerald-400 max-h-[300px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                    {item.convertedBlob ? 'Formatted file output generated successfully.' : 'Processing data payload...'}
+                    {convertedText || (item.convertedBlob ? 'Formatted file output generated successfully.' : 'Processing data payload...')}
                   </div>
                 </div>
               )}

@@ -29,8 +29,8 @@ export class UploadError extends Error {
 
 const ALLOWED_MIME: Record<string, string[]> = {
   image: ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/x-icon", "image/svg+xml", "image/avif"],
-  audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/mp4", "audio/flac", "audio/x-wav"],
-  video: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska"],
+  audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/mp4", "audio/flac", "audio/x-wav", "audio/x-m4a", "audio/webm"],
+  video: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/x-flv"],
   document: ["application/pdf", "text/plain", "text/markdown", "text/html"],
   data: ["application/json", "text/csv", "application/xml", "text/xml", "text/yaml", "text/tab-separated-values"],
 };

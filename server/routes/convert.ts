@@ -37,7 +37,12 @@ convertRouter.post("/", async (req, res) => {
     }
 
     res.setHeader("Content-Type", mime);
-    res.setHeader("Content-Length", String(result.size ?? 0));
+    // Only set Content-Length when we actually know the size. If statSync failed
+    // (size === 0), omitting the header lets Express use chunked transfer encoding
+    // instead of telling the client the body is empty.
+    if (result.size > 0) {
+      res.setHeader("Content-Length", String(result.size));
+    }
     res.setHeader("Content-Disposition", `attachment; filename="converted.${upload.targetFormat}"`);
 
     // Stream the on-disk ffmpeg output straight to the client — never buffer it in RAM.

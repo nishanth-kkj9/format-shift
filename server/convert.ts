@@ -81,6 +81,9 @@ export async function convertFile(
   }
 
   if (AUDIO_TARGETS.has(tgt)) {
+    // Guard against a registry/codec-map drift: if the target is registered but
+    // has no encoder, fail loudly instead of crashing on a non-null assertion.
+    if (!AUDIO_CODECS[tgt]) throw new UnsupportedConversionError(cat, tgt);
     const result = await runFFmpeg(audioArgs(opts), { inputPath, signal: runOptions.signal }).catch((e: Error) => {
       if (/does not contain any stream/i.test(e.message)) {
         throw new NoAudioStreamError();
@@ -91,6 +94,9 @@ export async function convertFile(
   }
 
   if (VIDEO_TARGETS.has(tgt)) {
+    // Guard against a registry/codec-map drift: if the target is registered but
+    // has no encoder, fail loudly instead of crashing on a non-null assertion.
+    if (!VIDEO_CODECS[tgt]) throw new UnsupportedConversionError(cat, tgt);
     const result = await runFFmpeg(videoArgs(opts), { inputPath, signal: runOptions.signal });
     return { data: Buffer.alloc(0), mime, result };
   }

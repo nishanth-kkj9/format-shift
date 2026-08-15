@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -55,6 +55,9 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
   const [isFormatGuideOpen, setIsFormatGuideOpen] = useState(false);
+
+  // Track in-flight abort controllers so the UI can cancel conversions.
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   // Sync theme class to <html> tag
   useEffect(() => {
@@ -180,6 +183,7 @@ export default function App() {
 
     // Create abort controller for this conversion
     const abortController = new AbortController();
+    abortControllersRef.current.set(id, abortController);
 
     // Update state to converting
     setQueue((prev) =>
@@ -310,15 +314,34 @@ export default function App() {
     } finally {
       // Clean up abort controller event listener
       abortController.signal.removeEventListener('abort', handleAbort);
+      abortControllersRef.current.delete(id);
     }
   };
 
-  // Convert All Pending Files
+  // Cancel an in-progress conversion
+  const handleCancelConversion = (id: string) => {
+    const controller = abortControllersRef.current.get(id);
+    if (controller) {
+      controller.abort();
+    }
+  };
+
+  // Convert All Pending Files — run up to 3 conversions concurrently for
+  // better batch throughput without overwhelming the browser/server.
   const handleConvertAll = async () => {
     const pendingItems = queue.filter((item) => item.status !== 'completed');
-    for (const item of pendingItems) {
-      await convertSingleFile(item.id);
-    }
+    const CONCURRENCY = 3;
+    let nextIndex = 0;
+
+    const worker = async () => {
+      while (nextIndex < pendingItems.length) {
+        const item = pendingItems[nextIndex++];
+        await convertSingleFile(item.id);
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, pendingItems.length) }, () => worker());
+    await Promise.allSettled(workers);
 
     // Trigger celebratory confetti on batch completion!
     try {
@@ -388,6 +411,10 @@ export default function App() {
     setQueue((prev) => {
       prev.forEach((item) => {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        // Only revoke convertedUrl if it's not referenced in history
+        if (item.convertedUrl && !history.some((h) => h.downloadUrl === item.convertedUrl)) {
+          URL.revokeObjectURL(item.convertedUrl);
+        }
       });
       return [];
     });
@@ -476,6 +503,7 @@ export default function App() {
                 onTargetFormatChange={handleTargetFormatChange}
                 onOpenOptions={(item) => setOptionsItem(item)}
                 onConvertSingle={convertSingleFile}
+                onCancelConversion={handleCancelConversion}
                 onPreview={(item) => setPreviewItem(item)}
                 onDownload={handleDownloadSingle}
                 onRemove={handleRemove}

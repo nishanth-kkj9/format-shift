@@ -18,6 +18,7 @@ import {
   Clock,
   Maximize2,
   FileCode,
+  XCircle,
 } from 'lucide-react';
 import { ConversionItem, TargetFormat } from '../types';
 import { formatBytes } from '../utils/converter';
@@ -29,6 +30,7 @@ interface FileListProps {
   onTargetFormatChange: (id: string, format: TargetFormat) => void;
   onOpenOptions: (item: ConversionItem) => void;
   onConvertSingle: (id: string) => void;
+  onCancelConversion: (id: string) => void;
   onPreview: (item: ConversionItem) => void;
   onDownload: (item: ConversionItem) => void;
   onRemove: (id: string) => void;
@@ -39,6 +41,7 @@ export const FileList: React.FC<FileListProps> = ({
   onTargetFormatChange,
   onOpenOptions,
   onConvertSingle,
+  onCancelConversion,
   onPreview,
   onDownload,
   onRemove,
@@ -252,11 +255,23 @@ export const FileList: React.FC<FileListProps> = ({
                         </motion.button>
                       )}
 
-                      {/* Converting Status Spinner */}
+                      {/* Converting Status Spinner + Cancel Button */}
                       {isConverting && (
-                        <div className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 text-indigo-300 flex items-center gap-1.5 border border-indigo-400/30">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> {item.progress}%
-                        </div>
+                        <>
+                          <div className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 text-indigo-300 flex items-center gap-1.5 border border-indigo-400/30">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> {item.progress}%
+                          </div>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            type="button"
+                            onClick={() => onCancelConversion(item.id)}
+                            title="Cancel Conversion"
+                            className="p-2 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </motion.button>
+                        </>
                       )}
 
                       {/* Download & Preview Buttons (when completed) */}

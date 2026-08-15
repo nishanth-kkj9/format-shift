@@ -100,6 +100,7 @@ export async function convertAudioToSpectrumVideo(
     }
 
     let renderTimer: ReturnType<typeof setInterval> | undefined;
+    let safetyTimer: number | undefined;
     const style = options.spectrumStyle || 'bars';
     const theme = options.spectrumTheme || 'indigo-violet';
     const trackName = file.name.replace(/\.[^/.]+$/, '');
@@ -172,7 +173,7 @@ export async function convertAudioToSpectrumVideo(
 
     // Safety net: if onended never fires (e.g. suspended context edge cases),
     // force stop shortly after the audio would have finished.
-    const safetyTimer = window.setTimeout(() => {
+    safetyTimer = window.setTimeout(() => {
       // Check for abort in safety timer callback
       if (abortSignal?.aborted) {
         if (renderTimer) clearInterval(renderTimer);
