@@ -186,6 +186,45 @@ describe("parseUploadStream", () => {
     });
   });
 
+  it("rejects application/octet-stream for binary categories (no magic bytes)", async () => {
+    const payload = multipartBody([
+      { name: "category", value: "image" },
+      { name: "targetFormat", value: "png" },
+      { name: "options", value: "{}" },
+      { name: "file", filename: "mystery.png", type: "application/octet-stream", data: Buffer.from("hello") },
+    ]);
+    await expect(parseUploadStream(fakeReq(payload, { "x-category": "image" }))).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  it("rejects a PNG whose declared mime belongs to another binary category", async () => {
+    const payload = multipartBody([
+      { name: "category", value: "audio" },
+      { name: "targetFormat", value: "mp3" },
+      { name: "options", value: "{}" },
+      { name: "file", filename: "audio.mp3", type: "audio/mpeg", data: PNG_BYTES },
+    ]);
+    await expect(parseUploadStream(fakeReq(payload, { "x-category": "audio" }))).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  it("still tolerates application/octet-stream for text categories", async () => {
+    const payload = multipartBody([
+      { name: "category", value: "document" },
+      { name: "targetFormat", value: "txt" },
+      { name: "options", value: "{}" },
+      { name: "file", filename: "notes.txt", type: "application/octet-stream", data: Buffer.from("hello") },
+    ]);
+    const up = await parseUploadStream(fakeReq(payload, { "x-category": "document" }));
+    try {
+      expect(up.sourceFormat).toBe("txt");
+    } finally {
+      cleanup(up.tempDir, up.filePath);
+    }
+  });
+
   it("prefers header category over the form field", async () => {
     const payload = multipartBody([
       { name: "category", value: "document" },

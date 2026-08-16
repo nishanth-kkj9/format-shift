@@ -258,14 +258,25 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
     // when their declared MIME is in the allowlist.
     let detected: { ext: string; mime: string } | null = null;
     // fileTypeFromBuffer returns FileTypeResult | undefined; normalize to our type
-    if (ALLOWED_MIME[cat]) {
+    const spec = CONVERSION_REGISTRY[cat as keyof typeof CONVERSION_REGISTRY];
+    if (ALLOWED_MIME[cat] && spec) {
       const ft = await fileTypeFromBuffer(Buffer.concat(head));
       detected = ft ? { ext: ft.ext, mime: ft.mime } : null;
-      if (detected && !ALLOWED_MIME[cat].includes(detected.mime)) {
-        throw new UploadError(`File content (${detected.mime}) does not match category ${category}`);
-      }
-      if (!detected && mimetype !== "application/octet-stream" && !ALLOWED_MIME[cat].includes(mimetype)) {
-        throw new UploadError(`File type ${mimetype} not allowed for category ${category}`);
+      if (detected) {
+        const accepted =
+          spec.sourceFormats.includes(detected.ext) || ALLOWED_MIME[cat].includes(detected.mime);
+        if (!accepted) {
+          throw new UploadError(`File content (${detected.mime}) does not match category ${category}`);
+        }
+      } else {
+        // Binary categories (image/audio/video) have detectable magic bytes, so
+        // an undetected file is only trusted when its declared MIME is
+        // allowlisted — application/octet-stream must not bypass validation.
+        // Text categories stay lenient for the multipart client.
+        const isBinary = cat === "image" || cat === "audio" || cat === "video";
+        if (!ALLOWED_MIME[cat].includes(mimetype) && (isBinary || mimetype !== "application/octet-stream")) {
+          throw new UploadError(`File type ${mimetype} not allowed for category ${category}`);
+        }
       }
     }
 

@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { FFMPEG_BIN } from "./ffmpeg/runner";
 
 // 1x1 transparent PNG — has real PNG magic bytes (\x89PNG\r\n\x1a\n)
 const TINY_PNG = Buffer.from(
@@ -359,6 +360,19 @@ describe("Health endpoint", () => {
   });
 });
 
+describe("Ready endpoint", () => {
+  it("reports ready only when ffmpeg meets both baselines", async () => {
+    const res = await fetch(`${base}/api/ready`);
+    expect([200, 503]).toContain(res.status);
+    const body = await res.json();
+    expect(body.ready).toBe(res.status === 200);
+    expect(typeof body.ffmpegAvailable).toBe("boolean");
+    expect(typeof body.ffmpegVersion).toBe("string");
+    expect(typeof body.ffmpegFeatureCompatible).toBe("boolean");
+    expect(typeof body.ffmpegSecurityBaselineOk).toBe("boolean");
+  });
+});
+
 describe("Security headers", () => {
   it("includes X-Frame-Options DENY", async () => {
     const res = await fetch(`${base}/api/health`);
@@ -386,7 +400,7 @@ describe("Server-side source conversions (source-format validation)", () => {
 
   beforeAll(() => {
     fixtureDir = mkdtempSync(join(tmpdir(), "fs-fix-"));
-    const run = (args: string[]) => execFileSync("ffmpeg", ["-loglevel", "error", "-y", ...args]);
+    const run = (args: string[]) => execFileSync(FFMPEG_BIN, ["-loglevel", "error", "-y", ...args]);
     run([
       "-f",
       "lavfi",
@@ -487,4 +501,58 @@ describe("Server-side source conversions (source-format validation)", () => {
     });
     expect(res.status).toBe(413);
   }, 30000);
+});
+
+describe("Code template endpoint (honest snippets)", () => {
+  async function getTemplate(body: Record<string, string>) {
+    const res = await fetch(`${base}/api/code-template`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json()) as { code: { python: string } };
+    return { res, data };
+  }
+
+  it("image server conversion (png->gif) shows ffmpeg + label", async () => {
+    const { res, data } = await getTemplate({ category: "image", sourceFormat: "png", targetFormat: "gif" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("ffmpeg");
+    expect(data.code.python).toContain("Illustrative example");
+  });
+
+  it("video container (mp4->webm) uses the real codecs", async () => {
+    const { res, data } = await getTemplate({ category: "video", sourceFormat: "mp4", targetFormat: "webm" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("libvpx-vp9");
+    expect(data.code.python).toContain("libopus");
+    expect(data.code.python).toContain("Illustrative example");
+  });
+
+  it("video audio extraction (mp4->mp3) strips video and uses the audio codec", async () => {
+    const { res, data } = await getTemplate({ category: "video", sourceFormat: "mp4", targetFormat: "mp3" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("-vn");
+    expect(data.code.python).toContain("libmp3lame");
+  });
+
+  it("audio (mp3->wav) shows the pydub example", async () => {
+    const { res, data } = await getTemplate({ category: "audio", sourceFormat: "mp3", targetFormat: "wav" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("pydub");
+  });
+
+  it("data (json->csv) shows an honest csv example", async () => {
+    const { res, data } = await getTemplate({ category: "data", sourceFormat: "json", targetFormat: "csv" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("import csv");
+    expect(data.code.python).toContain("Illustrative example");
+  });
+
+  it("browser image (png->jpg) shows the PIL example", async () => {
+    const { res, data } = await getTemplate({ category: "image", sourceFormat: "png", targetFormat: "jpg" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("PIL");
+    expect(data.code.python).toContain("Illustrative example");
+  });
 });

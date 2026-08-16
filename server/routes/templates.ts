@@ -5,6 +5,8 @@ import {
   CONVERSION_REGISTRY,
 } from "../../src/core/conversionRegistry";
 import type { FileCategory } from "../../src/core/conversionRegistry";
+import { VIDEO_CODECS } from "../ffmpeg/video";
+import { AUDIO_CODECS } from "../ffmpeg/audio";
 
 export const templatesRouter = Router();
 
@@ -42,9 +44,16 @@ templatesRouter.post("/", (req, res) => {
 
   const engine = plan.target.engine;
 
-  const pythonCode = buildPython(cat, src, tgt, engine);
-  const nodeCode = buildNode(cat, src, tgt, engine);
-  const htmlCode = buildHtml(cat, src, tgt, engine);
+  // Every snippet is a starting point, not a turnkey script — say so instead
+  // of presenting illustrative code as authoritative.
+  const pythonCode =
+    `# Illustrative example — adapt paths and codecs to your pipeline.\n` +
+    buildPython(cat, src, tgt, engine);
+  const nodeCode =
+    `// Illustrative example — adapt paths and codecs to your pipeline.\n` + buildNode(cat, src, tgt, engine);
+  const htmlCode =
+    `<!-- Illustrative example — adapt paths and codecs to your pipeline. -->\n` +
+    buildHtml(cat, src, tgt, engine);
 
   return res.json({
     category: cat,
@@ -58,11 +67,20 @@ templatesRouter.post("/", (req, res) => {
 function buildPython(cat: FileCategory, src: string, tgt: string, engine: string): string {
   if (engine === "server") {
     if (cat === "video") {
+      // Use the same codecs the API's own ffmpeg pipeline uses for this target.
+      const codec = AUDIO_CODECS[tgt];
+      const args =
+        tgt === "gif"
+          ? ["-vf", "fps=10,scale=320:-1"]
+          : codec
+            ? ["-vn", "-c:a", codec]
+            : [...VIDEO_CODECS[tgt]!];
+      const argv = JSON.stringify(["ffmpeg", "-i", "input_path", ...args, "output_path"]);
       return `# Python Code (ffmpeg)
 import subprocess
 
 def convert_video(input_path, output_path):
-    subprocess.run(["ffmpeg", "-i", input_path, "-c:v", "libx264", "-c:a", "aac", output_path], check=True)
+    subprocess.run(${argv}, check=True)
 
 convert_video("input.${src}", "output.${tgt}")`;
     }
@@ -101,12 +119,31 @@ def convert_audio(input_file, output_file, bitrate="192k"):
 convert_audio("input.${src}", "output.${tgt}")`;
   }
 
-  return `# Python Code (pandas / json)
+  if (cat === "data") {
+    if (tgt === "csv" || tgt === "tsv") {
+      const delimiter = tgt === "tsv" ? "\\t" : ",";
+      return `# Python Code (csv module)
 import json
+import csv
 
 with open("input.${src}") as f:
     data = json.load(f)
-print(json.dumps(data, indent=2))`;
+
+with open("output.${tgt}", "w", newline="") as f:
+    writer = csv.writer(f, delimiter="${delimiter}")
+    if isinstance(data, list) and data:
+        writer.writerow(data[0].keys())
+        for row in data:
+            writer.writerow(row.values())
+    else:
+        writer.writerow(data)`;
+    }
+    return `# Python Code (illustrative example)
+# No single standard mapping for ${src} -> ${tgt}; adapt to your schema.`;
+  }
+
+  return `# Python Code (illustrative example)
+# No single standard recipe for ${cat} ${src} -> ${tgt}; adapt to your pipeline.`;
 }
 
 function buildNode(cat: FileCategory, src: string, tgt: string, engine: string): string {

@@ -6,6 +6,7 @@ import {
   getAvailableTargetsForSource,
   getMimeForTarget,
   needsServerEngine,
+  extensionForMime,
 } from "./conversionRegistry";
 import type { FileCategory } from "./conversionRegistry";
 
@@ -133,5 +134,22 @@ describe("conversion registry consistency", () => {
   it("HTML sources default to an honest target (plain text), not Markdown", () => {
     expect(CONVERSION_REGISTRY.document.defaultTarget("html")).toBe("txt");
     expect(CONVERSION_REGISTRY.document.defaultTarget("htm")).toBe("txt");
+  });
+
+  it("extensionForMime resolves canonical extensions from MIME types", () => {
+    expect(extensionForMime("image/jpeg")).toBe("jpg");
+    expect(extensionForMime("image/png")).toBe("png");
+    expect(extensionForMime("image/webp")).toBe("webp");
+    expect(extensionForMime("image/gif")).toBe("gif");
+    expect(extensionForMime("image/avif")).toBe("avif");
+    expect(extensionForMime("audio/mp4")).toBe("m4a");
+    expect(extensionForMime("video/mp4")).toBe("mp4");
+    expect(extensionForMime("video/webm")).toBe("webm");
+    expect(extensionForMime("video/quicktime")).toBe("mov");
+  });
+
+  it("extensionForMime returns null for unknown MIME types", () => {
+    expect(extensionForMime("application/octet-stream")).toBeNull();
+    expect(extensionForMime("")).toBeNull();
   });
 });

@@ -271,3 +271,14 @@ export function getMimeForTarget(category: FileCategory, targetFormat: string): 
 export function needsServerEngine(category: FileCategory, targetFormat: string): boolean {
   return CONVERSION_REGISTRY[category]?.targets[targetFormat?.toLowerCase()]?.engine === "server";
 }
+
+/** File extension for a MIME type (or null). Registry insertion order decides
+ *  canonical winners (e.g. image/jpeg -> jpg, audio/mp4 -> m4a, video/mp4 -> mp4). */
+export function extensionForMime(mime: string): string | null {
+  for (const spec of Object.values(CONVERSION_REGISTRY)) {
+    for (const target of Object.values(spec.targets)) {
+      if (target.mime === mime) return target.format;
+    }
+  }
+  return null;
+}

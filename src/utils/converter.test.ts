@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { jsonToCsv, csvToJson, jsonToXml, jsonToYaml, markdownToHtml, formatBytes } from "./converter";
-import { resolveTrimRange, renderFrameLength } from "./convertAudio";
+import { resolveTrimRange, renderFrameLength, trackAudioContextClose } from "./convertAudio";
 import { convertDataDocument } from "./convertData";
 import { convertAudio } from "./convertAudio";
 import { convertVideo } from "./convertVideo";
+import { guardedSettlers } from "./convertImage";
 import { planConversion } from "../core/conversionRegistry";
 
 describe("jsonToCsv", () => {
@@ -252,6 +253,82 @@ describe("formatBytes", () => {
 
   it("formats MB", () => {
     expect(formatBytes(1024 * 1024)).toBe("1 MB");
+  });
+});
+
+describe("trackAudioContextClose", () => {
+  it("closes the context exactly once across repeated calls", () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const release = trackAudioContextClose({ close });
+    release();
+    release();
+    release();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("swallows close() rejection", async () => {
+    const close = vi.fn().mockRejectedValue(new Error("already closed"));
+    const release = trackAudioContextClose({ close });
+    expect(() => release()).not.toThrow();
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("guardedSettlers", () => {
+  function pending<T>() {
+    let resolve!: (v: T | PromiseLike<T>) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it("rejects with AbortError when the signal is already aborted and blocks a later resolve", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { promise, resolve, reject } = pending<number>();
+    const g = guardedSettlers<number>(controller.signal, resolve, reject);
+    g.resolve(42);
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("rejects immediately on abort and ignores a racing resolve", async () => {
+    const controller = new AbortController();
+    const { promise, resolve, reject } = pending<number>();
+    const g = guardedSettlers<number>(controller.signal, resolve, reject);
+    controller.abort();
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    g.resolve(42); // no-op: must not throw or double-settle
+  });
+
+  it("resolves normally when never aborted and ignores later calls", async () => {
+    const controller = new AbortController();
+    const { promise, resolve } = pending<number>();
+    const g = guardedSettlers<number>(controller.signal, resolve, () => {});
+    g.resolve(7);
+    await expect(promise).resolves.toBe(7);
+    g.resolve(8);
+  });
+
+  it("checkAborted reports once the signal is aborted", async () => {
+    const controller = new AbortController();
+    const { promise, resolve, reject } = pending<number>();
+    const g = guardedSettlers<number>(controller.signal, resolve, reject);
+    expect(g.checkAborted()).toBe(false);
+    controller.abort();
+    expect(g.checkAborted()).toBe(true);
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("does not double-settle: reject after resolve is ignored", async () => {
+    const controller = new AbortController();
+    const { promise, resolve, reject } = pending<number>();
+    const g = guardedSettlers<number>(controller.signal, resolve, reject);
+    g.resolve(1);
+    g.reject(new Error("late"));
+    await expect(promise).resolves.toBe(1);
   });
 });
 

@@ -12,7 +12,8 @@ import {
   getFFmpegConcurrency,
   getFFmpegVersion,
   isFfmpegAtLeast,
-  MIN_FFMPEG_VERSION,
+  FFMPEG_MIN_FEATURE_VERSION,
+  FFMPEG_MIN_SECURITY_VERSION,
   FFMPEG_BIN,
 } from "./ffmpeg/runner";
 import { env } from "./config";
@@ -108,14 +109,32 @@ app.get("/api/health", (_req, res) => {
     status: "ok",
     app: "FormatShift Universal Converter",
     timestamp: new Date().toISOString(),
-    ffmpeg: FFMPEG_BIN ? "available" : "missing",
+    ffmpegAvailable: Boolean(FFMPEG_BIN),
     ffmpegVersion,
-    ffmpegVersionOk: isFfmpegAtLeast(ffmpegVersion, MIN_FFMPEG_VERSION),
+    ffmpegFeatureCompatible: isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_FEATURE_VERSION),
+    ffmpegSecurityBaselineOk: isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_SECURITY_VERSION),
     ffmpegConcurrency: {
       max: concurrency.max,
       active: concurrency.active,
       queued: concurrency.queued,
     },
+  });
+});
+
+// Liveness + readiness for Docker/K8s probes: 200 only when the server can
+// actually convert (ffmpeg present and meeting both version baselines).
+app.get("/api/ready", (_req, res) => {
+  const ffmpegVersion = getFFmpegVersion();
+  const ffmpegAvailable = Boolean(FFMPEG_BIN);
+  const ffmpegFeatureCompatible = isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_FEATURE_VERSION);
+  const ffmpegSecurityBaselineOk = isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_SECURITY_VERSION);
+  const ready = ffmpegAvailable && ffmpegFeatureCompatible && ffmpegSecurityBaselineOk;
+  res.status(ready ? 200 : 503).json({
+    ready,
+    ffmpegAvailable,
+    ffmpegVersion,
+    ffmpegFeatureCompatible,
+    ffmpegSecurityBaselineOk,
   });
 });
 

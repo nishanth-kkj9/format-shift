@@ -110,6 +110,23 @@ export function renderFrameLength(durationSec: number, targetSampleRate: number)
   return Math.max(1, Math.round(durationSec * targetSampleRate));
 }
 
+/**
+ * Returns an idempotent closer for an AudioContext that swallows close()
+ * rejection (close can reject once the context is already unusable). Wrapping
+ * the conversion body in try/finally guarantees the context is released on
+ * every path — decode failure, invalid trim, render failure, abort, or success.
+ */
+export function trackAudioContextClose(ctx: { close(): Promise<void> }): () => void {
+  let closed = false;
+  return () => {
+    if (closed) return;
+    closed = true;
+    ctx.close().catch(() => {
+      // already closed / already in an unusable state
+    });
+  };
+}
+
 // Convert Audio / Extract Audio from Video using AudioContext & Web Audio API
 export async function convertAudio(
   file: File,
@@ -144,58 +161,60 @@ export async function convertAudio(
     window.AudioContext ||
     (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioCtx = new AudioCtxClass();
+  const closeCtx = trackAudioContextClose(audioCtx);
 
-  let decodedBuffer: AudioBuffer;
   try {
-    decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  } catch {
-    throw new Error("Could not decode audio data from file");
+    let decodedBuffer: AudioBuffer;
+    try {
+      decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch {
+      throw new Error("Could not decode audio data from file");
+    }
+
+    // Check for abort after decoding
+    if (abortSignal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    onProgress?.(60);
+    const duration = decodedBuffer.duration;
+
+    // Handle trim start / trim end (validated, never silently ignored)
+    const { start: startSec, end: endSec } = resolveTrimRange(duration, options.trimStart, options.trimEnd);
+
+    const targetSampleRate = options.sampleRate || decodedBuffer.sampleRate;
+    const numChannels = options.channels || Math.min(decodedBuffer.numberOfChannels, 2);
+
+    const frameLength = renderFrameLength(endSec - startSec, targetSampleRate);
+
+    // Render to OfflineAudioContext
+    const offlineCtx = new OfflineAudioContext(numChannels, frameLength, targetSampleRate);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = decodedBuffer;
+
+    // Apply Gain / Volume
+    const gainNode = offlineCtx.createGain();
+    gainNode.gain.value = (options.volume || 100) / 100;
+
+    source.connect(gainNode);
+    gainNode.connect(offlineCtx.destination);
+
+    source.start(0, startSec, endSec - startSec);
+
+    onProgress?.(80);
+    const renderedBuffer = await offlineCtx.startRendering();
+
+    // Check for abort after rendering
+    if (abortSignal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    // Export to WAV PCM
+    const wavBlob = audioBufferToWavBlob(renderedBuffer);
+    onProgress?.(100);
+
+    return { blob: wavBlob, duration: endSec - startSec };
+  } finally {
+    closeCtx();
   }
-
-  // Check for abort after decoding
-  if (abortSignal?.aborted) {
-    audioCtx.close();
-    throw new DOMException("Aborted", "AbortError");
-  }
-
-  onProgress?.(60);
-  const duration = decodedBuffer.duration;
-
-  // Handle trim start / trim end (validated, never silently ignored)
-  const { start: startSec, end: endSec } = resolveTrimRange(duration, options.trimStart, options.trimEnd);
-
-  const targetSampleRate = options.sampleRate || decodedBuffer.sampleRate;
-  const numChannels = options.channels || Math.min(decodedBuffer.numberOfChannels, 2);
-
-  const frameLength = renderFrameLength(endSec - startSec, targetSampleRate);
-
-  // Render to OfflineAudioContext
-  const offlineCtx = new OfflineAudioContext(numChannels, frameLength, targetSampleRate);
-  const source = offlineCtx.createBufferSource();
-  source.buffer = decodedBuffer;
-
-  // Apply Gain / Volume
-  const gainNode = offlineCtx.createGain();
-  gainNode.gain.value = (options.volume || 100) / 100;
-
-  source.connect(gainNode);
-  gainNode.connect(offlineCtx.destination);
-
-  source.start(0, startSec, endSec - startSec);
-
-  onProgress?.(80);
-  const renderedBuffer = await offlineCtx.startRendering();
-
-  // Check for abort after rendering
-  if (abortSignal?.aborted) {
-    audioCtx.close();
-    throw new DOMException("Aborted", "AbortError");
-  }
-
-  // Export to WAV PCM
-  const wavBlob = audioBufferToWavBlob(renderedBuffer);
-  onProgress?.(100);
-
-  audioCtx.close();
-  return { blob: wavBlob, duration: endSec - startSec };
 }

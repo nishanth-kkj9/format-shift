@@ -33,12 +33,70 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime });
 }
 
+/**
+ * Guards a promise's resolve/reject against a caller-supplied AbortSignal:
+ * - a signal already aborted (or an abort that arrives mid-operation) settles
+ *   the promise with AbortError exactly once;
+ * - after the promise settles, no further resolve/reject call has any effect
+ *   (no double-settle from racing callbacks like canvas.toBlob);
+ * - `checkAborted` is a stage guard for the gaps between callbacks, where an
+ *   abort event cannot interrupt synchronous work.
+ * Exported so the contract is unit-testable without a DOM.
+ */
+export function guardedSettlers<T>(
+  signal: AbortSignal | undefined,
+  resolve: (value: T | PromiseLike<T>) => void,
+  reject: (reason?: unknown) => void
+): {
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+  checkAborted: () => boolean;
+} {
+  let settled = false;
+  let aborted = false;
+  const onAbort = () => {
+    aborted = true;
+    if (!settled) {
+      settled = true;
+      reject(new DOMException("Conversion aborted", "AbortError"));
+    }
+  };
+  if (signal?.aborted) {
+    onAbort();
+  } else {
+    signal?.addEventListener("abort", onAbort, { once: true });
+  }
+  const cleanup = () => {
+    settled = true;
+    signal?.removeEventListener("abort", onAbort);
+  };
+  return {
+    resolve: (value) => {
+      if (settled) return;
+      cleanup();
+      resolve(value);
+    },
+    reject: (reason) => {
+      if (settled) return;
+      cleanup();
+      reject(reason);
+    },
+    checkAborted: () => {
+      if (signal?.aborted) {
+        onAbort();
+      }
+      return aborted;
+    },
+  };
+}
+
 // Convert Image using HTML5 Canvas
 export async function convertImage(
   file: File,
   targetFormat: TargetFormat,
   options: ImageConversionOptions,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  abortSignal?: AbortSignal
 ): Promise<{ blob: Blob; dimensions: { width: number; height: number } }> {
   const tgt = targetFormat.toLowerCase();
   // Fail loudly for server-only targets instead of producing a mislabeled blob.
@@ -52,13 +110,20 @@ export async function convertImage(
   onProgress?.(10);
 
   return new Promise((resolve, reject) => {
+    const g = guardedSettlers<{ blob: Blob; dimensions: { width: number; height: number } }>(
+      abortSignal,
+      resolve,
+      reject
+    );
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.onerror = () => g.reject(new Error("Failed to read image file"));
     reader.onload = () => {
+      if (g.checkAborted()) return;
       onProgress?.(30);
       const img = new Image();
-      img.onerror = () => reject(new Error("Invalid image data"));
+      img.onerror = () => g.reject(new Error("Invalid image data"));
       img.onload = () => {
+        if (g.checkAborted()) return;
         onProgress?.(50);
         let width = img.width;
         let height = img.height;
@@ -80,7 +145,7 @@ export async function convertImage(
           canvas.height = presetDim.h;
           const ctx = canvas.getContext("2d");
           if (!ctx) {
-            reject(new Error("Could not get canvas 2d context"));
+            g.reject(new Error("Could not get canvas 2d context"));
             return;
           }
 
@@ -116,14 +181,15 @@ export async function convertImage(
           if (tgt === "png") mimeType = "image/png";
           else if (tgt === "webp") mimeType = "image/webp";
 
+          if (g.checkAborted()) return;
           canvas.toBlob(
             (blob) => {
               onProgress?.(100);
               try {
                 assertBlobMatches(blob, tgt);
-                resolve({ blob: blob!, dimensions: { width: canvas.width, height: canvas.height } });
+                g.resolve({ blob: blob!, dimensions: { width: canvas.width, height: canvas.height } });
               } catch (err) {
-                reject(err);
+                g.reject(err);
               }
             },
             mimeType,
@@ -149,7 +215,7 @@ export async function convertImage(
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          reject(new Error("Could not get canvas 2d context"));
+          g.reject(new Error("Could not get canvas 2d context"));
           return;
         }
 
@@ -199,25 +265,27 @@ export async function convertImage(
 
         // Special handling for SVG wrapper format
         if (tgt === "svg") {
+          if (g.checkAborted()) return;
           const dataUrl = canvas.toDataURL("image/png");
           const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">
             <image href="${dataUrl}" width="${canvas.width}" height="${canvas.height}" />
           </svg>`;
           const blob = new Blob([svgString], { type: "image/svg+xml" });
           onProgress?.(100);
-          resolve({ blob, dimensions: { width: canvas.width, height: canvas.height } });
+          g.resolve({ blob, dimensions: { width: canvas.width, height: canvas.height } });
           return;
         }
 
         const qualityVal = (options.quality || 85) / 100;
+        if (g.checkAborted()) return;
         canvas.toBlob(
           (blob) => {
             onProgress?.(100);
             try {
               assertBlobMatches(blob, tgt);
-              resolve({ blob: blob!, dimensions: { width: canvas.width, height: canvas.height } });
+              g.resolve({ blob: blob!, dimensions: { width: canvas.width, height: canvas.height } });
             } catch (err) {
-              reject(err);
+              g.reject(err);
             }
           },
           mimeType,

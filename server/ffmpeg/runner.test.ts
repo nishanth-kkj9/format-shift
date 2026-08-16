@@ -1,12 +1,24 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   parseFfmpegVersion,
   isFfmpegAtLeast,
   getFFmpegVersion,
-  MIN_FFMPEG_VERSION,
+  FFMPEG_MIN_FEATURE_VERSION,
   FFMPEG_BIN,
+  runFFmpeg,
+  OutputLimitError,
+  getFFmpegConcurrency,
 } from "./runner";
+
+// 1x1 transparent PNG
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64"
+);
 
 describe("parseFfmpegVersion", () => {
   it("parses the version from real -version output shapes", () => {
@@ -25,15 +37,15 @@ describe("parseFfmpegVersion", () => {
 
 describe("isFfmpegAtLeast", () => {
   it("accepts equal and newer versions", () => {
-    expect(isFfmpegAtLeast("4.2.0", MIN_FFMPEG_VERSION)).toBe(true);
-    expect(isFfmpegAtLeast("6.1.1", MIN_FFMPEG_VERSION)).toBe(true);
+    expect(isFfmpegAtLeast("4.2.0", FFMPEG_MIN_FEATURE_VERSION)).toBe(true);
+    expect(isFfmpegAtLeast("6.1.1", FFMPEG_MIN_FEATURE_VERSION)).toBe(true);
     expect(isFfmpegAtLeast("5.1.1", "4.2.0")).toBe(true);
   });
 
   it("rejects older versions and null", () => {
-    expect(isFfmpegAtLeast("4.1.0", MIN_FFMPEG_VERSION)).toBe(false);
+    expect(isFfmpegAtLeast("4.1.0", FFMPEG_MIN_FEATURE_VERSION)).toBe(false);
     expect(isFfmpegAtLeast("4.2", "4.2.1")).toBe(false);
-    expect(isFfmpegAtLeast(null, MIN_FFMPEG_VERSION)).toBe(false);
+    expect(isFfmpegAtLeast(null, FFMPEG_MIN_FEATURE_VERSION)).toBe(false);
   });
 });
 
@@ -51,6 +63,49 @@ describe("resolved ffmpeg binary version", () => {
   it.skipIf(!binaryAvailable)("reports the active binary version and it meets the minimum", () => {
     const version = getFFmpegVersion();
     expect(version).toBeTruthy();
-    expect(isFfmpegAtLeast(version, MIN_FFMPEG_VERSION)).toBe(true);
+    expect(isFfmpegAtLeast(version, FFMPEG_MIN_FEATURE_VERSION)).toBe(true);
+  });
+});
+
+describe("output size limit", () => {
+  function withOutputLimit(max: string, fn: () => Promise<void>) {
+    const prev = process.env.FFMPEG_MAX_OUTPUT_BYTES;
+    process.env.FFMPEG_MAX_OUTPUT_BYTES = max;
+    return fn().finally(() => {
+      if (prev === undefined) delete process.env.FFMPEG_MAX_OUTPUT_BYTES;
+      else process.env.FFMPEG_MAX_OUTPUT_BYTES = prev;
+    });
+  }
+
+  it("rejects output that exceeds FFMPEG_MAX_OUTPUT_BYTES and cleans up", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fs-r1-"));
+    const input = join(dir, "in.png");
+    writeFileSync(input, TINY_PNG);
+    try {
+      await withOutputLimit("10", async () => {
+        await expect(runFFmpeg(["-f", "image2", "-c:v", "png"], { inputPath: input })).rejects.toBeInstanceOf(
+          OutputLimitError
+        );
+      });
+      expect(getFFmpegConcurrency().active).toBe(0);
+      expect(readdirSync(dir)).toEqual(["in.png"]); // output temp dir removed
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts output under the limit", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fs-r1-"));
+    const input = join(dir, "in.png");
+    writeFileSync(input, TINY_PNG);
+    try {
+      await withOutputLimit(String(1024 * 1024), async () => {
+        const res = await runFFmpeg(["-f", "image2", "-c:v", "png"], { inputPath: input });
+        expect(res.size).toBeGreaterThan(0);
+        res.cleanup();
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

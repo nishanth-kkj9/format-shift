@@ -7,6 +7,9 @@ const envSchema = z.object({
   FFMPEG_PATH: z.string().min(1).optional(),
   FFMPEG_MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
   FFMPEG_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
+  FFMPEG_MAX_OUTPUT_BYTES: z.coerce.number().int().positive().optional(),
+  FFMPEG_MIN_SECURITY_VERSION: z.string().min(1).optional(),
+  FFMPEG_MIN_FEATURE_VERSION: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

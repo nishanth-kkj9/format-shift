@@ -12,6 +12,8 @@ import {
 import { extractFileMetadata } from "./utils/metadata";
 import { clearHistoryRevoking, historyForStorage, hydrateHistory } from "./utils/historyCleanup";
 import { convertServerSide, needsServerConversion } from "./utils/serverConvert";
+import { zipBatchOverLimit, ZIP_MAX_TOTAL_BYTES } from "./utils/zipPolicy";
+import { extensionForMime } from "./core/conversionRegistry";
 
 import { Header } from "./components/Header";
 import { Dropzone } from "./components/Dropzone";
@@ -245,7 +247,13 @@ export default function App() {
         );
         updateProgress(100);
       } else if (item.category === "image") {
-        const res = await convertImage(item.file, item.targetFormat, item.options.image!, updateProgress);
+        const res = await convertImage(
+          item.file,
+          item.targetFormat,
+          item.options.image!,
+          updateProgress,
+          abortController.signal
+        );
         resultBlob = res.blob;
         dimensions = res.dimensions;
       } else if (item.category === "audio") {
@@ -282,23 +290,7 @@ export default function App() {
       const convertedUrl = URL.createObjectURL(resultBlob);
       queueUrlsRef.current.add(convertedUrl);
       const nameWithoutExt = item.name.substring(0, item.name.lastIndexOf(".")) || item.name;
-      const extFromMime = (t: string) =>
-        t === "video/webm"
-          ? "webm"
-          : t === "video/mp4"
-            ? "mp4"
-            : t === "image/gif"
-              ? "gif"
-              : t === "image/avif"
-                ? "avif"
-                : t === "image/webp"
-                  ? "webp"
-                  : t === "image/png"
-                    ? "png"
-                    : t === "image/jpeg"
-                      ? "jpg"
-                      : null;
-      const actualExt = extFromMime(resultBlob.type) || effectiveTarget;
+      const actualExt = extensionForMime(resultBlob.type) || effectiveTarget;
       const convertedName = `${nameWithoutExt}_converted.${actualExt}`;
 
       // Update item in queue as completed
@@ -406,6 +398,15 @@ export default function App() {
     const completedItems = queue.filter((item) => item.status === "completed" && item.convertedBlob);
     if (completedItems.length === 0) return;
 
+    // JSZip holds every blob in memory while building the archive; refuse a
+    // batch that would blow past the cap instead of OOM-ing the tab.
+    if (zipBatchOverLimit(completedItems.map((i) => i.convertedBlob!.size))) {
+      window.alert(
+        `Batch exceeds the ${ZIP_MAX_TOTAL_BYTES / 1024 / 1024}MB ZIP limit. Download files individually instead.`
+      );
+      return;
+    }
+
     // JSZip loads only when the user actually zips — keeps it out of the initial bundle.
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
@@ -415,7 +416,9 @@ export default function App() {
       }
     });
 
-    const content = await zip.generateAsync({ type: "blob" });
+    // STORE (no recompression): the media is already compressed, so DEFLATE
+    // only wastes CPU/memory for nothing.
+    const content = await zip.generateAsync({ type: "blob", compression: "STORE" });
     const zipUrl = URL.createObjectURL(content);
 
     const a = document.createElement("a");

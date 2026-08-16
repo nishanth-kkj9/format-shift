@@ -37,7 +37,16 @@ export const FFMPEG_BIN: string = resolveFfmpegBinary();
  * observed at runtime and reported on /api/health — nothing fails hard here so
  * CI/dev environments without a binary keep working.
  */
-export const MIN_FFMPEG_VERSION = "4.2.0";
+export const FFMPEG_MIN_FEATURE_VERSION = "4.2.0";
+
+/**
+ * Oldest FFmpeg release that still receives security backports (FFmpeg LTS /
+ * current distro baseline). Defaults to 5.1.0: Debian bookworm (the node:20-slim
+ * Docker base) ships a security-patched 5.1.4, so a higher default would make
+ * the health/ready gates always fail for the shipped image. Overridable via
+ * FFMPEG_MIN_SECURITY_VERSION for stricter policies.
+ */
+export const FFMPEG_MIN_SECURITY_VERSION = process.env.FFMPEG_MIN_SECURITY_VERSION || "5.1.0";
 
 /** Parse `ffmpeg -version` output into "major.minor.patch", or null. */
 export function parseFfmpegVersion(output: string): string | null {
@@ -105,11 +114,26 @@ const MAX_QUEUE = Math.max(1, MAX_CONCURRENT_FFMPEG * 5);
 /** Default ffmpeg timeout (ms). Override via FFMPEG_TIMEOUT_MS. */
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
+/** Default cap on ffmpeg output size (bytes). Override via FFMPEG_MAX_OUTPUT_BYTES. */
+const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024 * 1024;
+
+function maxOutputBytes(): number {
+  return Math.max(1, Number(process.env.FFMPEG_MAX_OUTPUT_BYTES) || DEFAULT_MAX_OUTPUT_BYTES);
+}
+
 /** Thrown when the ffmpeg queue is full; the route maps it to HTTP 503. */
 export class ServerBusyError extends Error {
   constructor() {
     super("Server is busy, please retry shortly");
     this.name = "ServerBusyError";
+  }
+}
+
+/** Thrown when ffmpeg writes past FFMPEG_MAX_OUTPUT_BYTES; the route maps it to HTTP 413. */
+export class OutputLimitError extends Error {
+  constructor() {
+    super("Converted output exceeds the server output size limit");
+    this.name = "OutputLimitError";
   }
 }
 
@@ -219,6 +243,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     let proc: ChildProcess;
     const err: Buffer[] = [];
     let settled = false;
+    let outputLimitExceeded = false;
 
     const abort = () => {
       if (!settled && proc && proc.exitCode === null) {
@@ -241,9 +266,25 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
 
     proc = spawn(FFMPEG_BIN, ["-hide_banner", "-nostdin", ...inputArgs, ...args, outPath]);
     proc.stderr?.on("data", (c: Buffer) => err.push(c));
+
+    // Kill a runaway encoder whose output file outgrows the cap before it fills
+    // the disk. The close handler's final size check is the authoritative
+    // backstop (deterministic even when the child finishes between polls).
+    const poll = setInterval(() => {
+      try {
+        if (statSync(outPath).size > maxOutputBytes()) {
+          outputLimitExceeded = true;
+          abort();
+        }
+      } catch {
+        // output file not created yet
+      }
+    }, 250);
+
     proc.on("error", (e) => {
       settled = true;
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      clearInterval(poll);
       opts.signal?.removeEventListener("abort", abort);
       cleanupTempDir(outPath);
       reject(new Error(e.message));
@@ -251,6 +292,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     proc.on("close", (code) => {
       settled = true;
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      clearInterval(poll);
       opts.signal?.removeEventListener("abort", abort);
       if (opts.signal?.aborted) {
         cleanupTempDir(outPath);
@@ -263,6 +305,11 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
           size = statSync(outPath).size;
         } catch {
           // leave 0; route falls back to no Content-Length header
+        }
+        if (outputLimitExceeded || size > maxOutputBytes()) {
+          cleanupTempDir(outPath);
+          reject(new OutputLimitError());
+          return;
         }
         resolve({ outPath, tempDir, size, cleanup: () => cleanupTempDir(outPath) });
       } else {
