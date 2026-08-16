@@ -33,7 +33,15 @@ export async function convertServerSide(
   const categoryKey = category as keyof ConversionOptions;
   form.append('options', JSON.stringify(options[categoryKey] || {}));
 
-  const res = await fetch('/api/convert', { method: 'POST', body: form, signal: abortSignal });
+  // Send category in header so server can enforce category-specific limits during streaming
+  const res = await fetch(`/api/convert?category=${encodeURIComponent(category)}`, {
+    method: 'POST',
+    body: form,
+    signal: abortSignal,
+    headers: {
+      'x-category': category,
+    },
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.error || `Server conversion failed (${res.status})`);

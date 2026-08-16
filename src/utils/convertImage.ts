@@ -1,22 +1,18 @@
 import { TargetFormat, ImageConversionOptions } from '../types';
 import { SOCIAL_PRESETS } from './detect';
+import { getMimeForTarget } from '../core/conversionRegistry';
 
 export { dataUrlToBlob };
-
-// Which MIME type the canvas encoder must produce for a given target. If the
-// browser cannot produce it, we throw instead of silently returning a PNG.
-const TARGET_MIME: Record<string, string> = {
-  png: 'image/png',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-};
 
 // Targets that must run on the FFmpeg server — the browser canvas cannot
 // reliably encode these. Rejecting here prevents silently mislabeled output.
 const SERVER_ONLY_IMAGE_TARGETS = new Set(['gif', 'bmp', 'ico', 'avif']);
 
+// Browser-supported targets (Canvas can encode these).
+const BROWSER_IMAGE_TARGETS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg']);
+
 function assertBlobMatches(blob: Blob | null, target: string): void {
-  const expected = TARGET_MIME[target];
+  const expected = getMimeForTarget('image', target);
   if (!blob) {
     throw new Error(`This browser cannot encode .${target} images (no blob output).`);
   }
@@ -48,6 +44,10 @@ export async function convertImage(
   // Fail loudly for server-only targets instead of producing a mislabeled blob.
   if (SERVER_ONLY_IMAGE_TARGETS.has(tgt)) {
     throw new Error(`Image -> ${targetFormat} must run on the FFmpeg server`);
+  }
+  // Validate target is a known browser-supported format.
+  if (!BROWSER_IMAGE_TARGETS.has(tgt)) {
+    throw new Error(`Image -> ${targetFormat} is not supported in the browser`);
   }
   onProgress?.(10);
 
@@ -186,16 +186,12 @@ export async function convertImage(
 
         onProgress?.(80);
 
-        // Determine target MIME type
+        // Determine target MIME type for browser-supported targets only
         let mimeType = 'image/jpeg';
         const tgt = targetFormat.toLowerCase();
         if (tgt === 'png') mimeType = 'image/png';
         else if (tgt === 'webp') mimeType = 'image/webp';
-        else if (tgt === 'bmp') mimeType = 'image/bmp';
-        else if (tgt === 'gif') mimeType = 'image/gif';
-        else if (tgt === 'ico') mimeType = 'image/x-icon';
         else if (tgt === 'svg') mimeType = 'image/svg+xml';
-        else if (tgt === 'avif') mimeType = 'image/avif';
 
         // Special handling for SVG wrapper format
         if (tgt === 'svg') {
@@ -206,28 +202,6 @@ export async function convertImage(
           const blob = new Blob([svgString], { type: 'image/svg+xml' });
           onProgress?.(100);
           resolve({ blob, dimensions: { width: canvas.width, height: canvas.height } });
-          return;
-        }
-
-        // ICO format output
-        if (tgt === 'ico') {
-          // Resize canvas to 32x32 for standard favicon icon
-          const icoCanvas = document.createElement('canvas');
-          icoCanvas.width = 32;
-          icoCanvas.height = 32;
-          const icoCtx = icoCanvas.getContext('2d');
-          icoCtx?.drawImage(canvas, 0, 0, 32, 32);
-          icoCanvas.toBlob(
-            (icoBlob) => {
-              if (icoBlob) {
-                onProgress?.(100);
-                resolve({ blob: icoBlob, dimensions: { width: 32, height: 32 } });
-              } else {
-                reject(new Error('Failed to export ICO file'));
-              }
-            },
-            'image/x-icon'
-          );
           return;
         }
 

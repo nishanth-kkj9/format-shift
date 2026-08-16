@@ -27,23 +27,64 @@ export interface FFmpegRunOptions {
  */
 const MAX_CONCURRENT_FFMPEG = Math.max(1, Number(process.env.FFMPEG_MAX_CONCURRENCY) || 2);
 
+/** Max jobs parked in the queue before new conversions are rejected (503). */
+const MAX_QUEUE = Math.max(1, MAX_CONCURRENT_FFMPEG * 5);
+
+/** Thrown when the ffmpeg queue is full; the route maps it to HTTP 503. */
+export class ServerBusyError extends Error {
+  constructor() {
+    super("Server is busy, please retry shortly");
+    this.name = "ServerBusyError";
+  }
+}
+
 let activeCount = 0;
 const waiters: (() => void)[] = [];
 
-function acquire(): Promise<void> {
+/** Get current FFmpeg concurrency metrics. */
+export function getFFmpegConcurrency(): { max: number; active: number; queued: number } {
+  return { max: MAX_CONCURRENT_FFMPEG, active: activeCount, queued: waiters.length };
+}
+
+/**
+ * Acquire an ffmpeg slot, or park in the bounded queue. When the queue is full
+ * (an abuse or overload signal) the request is rejected instead of growing
+ * unbounded. Exported for unit testing.
+ */
+export function acquireFFmpegSlot(): Promise<void> {
   if (activeCount < MAX_CONCURRENT_FFMPEG) {
     activeCount++;
     return Promise.resolve();
+  }
+  if (waiters.length >= MAX_QUEUE) {
+    return Promise.reject(new ServerBusyError());
   }
   return new Promise<void>((resolve) => waiters.push(resolve)).then(() => {
     activeCount++;
   });
 }
 
-function release(): void {
+/** Release an acquired ffmpeg slot and wake the next queued waiter. */
+export function releaseFFmpegSlot(): void {
   activeCount--;
   const next = waiters.shift();
   if (next) next();
+}
+
+/**
+ * Keep ffmpeg's stderr out of error responses except for the human-readable
+ * part: strip pointer addresses and absolute temp paths (server-side paths
+ * aren't a leak by themselves, but codec internals + paths are noise and
+ * slightly useful to an attacker probing the ffmpeg build).
+ */
+export function sanitizeFfmpegStderr(stderr: string): string {
+  return stderr
+    .replace(/\s*@\s*0x[0-9a-f]+/gi, "")
+    .replace(/(?:[A-Za-z]:)?[\\/][^\\/\s]*[\\/][^\\/\s]*/g, "…")
+    .split("\n")
+    .filter(Boolean)
+    .slice(-3)
+    .join(" | ");
 }
 
 /** Best-effort cleanup of the temp dir created for an output file. */
@@ -63,11 +104,11 @@ export function cleanupTempDir(outPath: string | null): void {
  * A concurrency semaphore caps the number of simultaneous ffmpeg processes.
  */
 export async function runFFmpeg(args: string[], opts: FFmpegRunOptions = {}): Promise<FFmpegResult> {
-  await acquire();
+  await acquireFFmpegSlot();
   try {
     return await runFFmpegInner(args, opts);
   } finally {
-    release();
+    releaseFFmpegSlot();
   }
 }
 
@@ -90,8 +131,8 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     };
     opts.signal?.addEventListener("abort", abort, { once: true });
 
-    // Kill the child if it exceeds the timeout. Default: 10 minutes.
-    const timeoutMs = opts.timeoutMs ?? (Number(process.env.FFMPEG_TIMEOUT_MS) || 10 * 60 * 1000);
+    // Kill the child if it exceeds the timeout. Default: 5 minutes.
+    const timeoutMs = opts.timeoutMs ?? (Number(process.env.FFMPEG_TIMEOUT_MS) || 5 * 60 * 1000);
     let timeoutHandle: NodeJS.Timeout | undefined;
     if (timeoutMs > 0) {
       timeoutHandle = setTimeout(() => {
@@ -130,9 +171,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
         resolve({ outPath, size, cleanup: () => cleanupTempDir(outPath) });
       } else {
         cleanupTempDir(outPath);
-        const stderr = Buffer.concat(err).toString("utf8");
-        const lastErr = stderr.split("\n").filter(Boolean).slice(-3).join("\n");
-        reject(new Error(`ffmpeg failed (${code}): ${lastErr}`));
+        reject(new Error(`ffmpeg failed (${code}): ${sanitizeFfmpegStderr(Buffer.concat(err).toString("utf8"))}`));
       }
     });
   });

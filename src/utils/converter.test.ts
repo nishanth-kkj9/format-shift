@@ -124,6 +124,83 @@ describe('markdownToHtml', () => {
     const result = markdownToHtml('**bold**');
     expect(result).toContain('<b>bold</b>');
   });
+
+  it('converts italic text', () => {
+    const result = markdownToHtml('*italic*');
+    expect(result).toContain('<i>italic</i>');
+  });
+
+  it('converts links with safe URLs', () => {
+    const result = markdownToHtml('[link](https://example.com)');
+    expect(result).toContain('<a href="https://example.com">link</a>');
+  });
+
+  it('allows relative URLs in links', () => {
+    const result = markdownToHtml('[link](/relative/path)');
+    expect(result).toContain('<a href="/relative/path">link</a>');
+  });
+
+  it('allows mailto URLs in links', () => {
+    const result = markdownToHtml('[email](mailto:test@example.com)');
+    expect(result).toContain('<a href="mailto:test@example.com">email</a>');
+  });
+
+  it('prevents attribute breakout via a quoted URL', () => {
+    const result = markdownToHtml('[x](https://example.com/" onmouseover="alert(1))');
+    // Quotes inside the URL are entity-escaped, so they cannot terminate the href
+    // attribute early and inject a new event-handler attribute.
+    expect(result).not.toContain('" onmouseover');
+    expect(result).toContain('&quot; onmouseover=&quot;');
+  });
+
+  it('sanitizes javascript: URLs in links', () => {
+    const result = markdownToHtml('[xss](javascript:alert(1))');
+    expect(result).toContain('<a href="#">xss</a>');
+    expect(result).not.toContain('javascript:');
+  });
+
+  it('sanitizes data: URLs in links', () => {
+    const result = markdownToHtml('[xss](data:text/html,<script>alert(1)</script>)');
+    expect(result).toContain('<a href="#">xss</a>');
+    expect(result).not.toContain('data:');
+  });
+
+  it('sanitizes vbscript: URLs in links', () => {
+    const result = markdownToHtml('[xss](vbscript:msgbox(1))');
+    expect(result).toContain('<a href="#">xss</a>');
+    expect(result).not.toContain('vbscript:');
+  });
+
+  it('escapes raw HTML in markdown input', () => {
+    const result = markdownToHtml('<script>alert(1)</script>');
+    // HTML should be escaped, so literal <script> tags should not appear
+    expect(result).not.toContain('<script>');
+    expect(result).not.toContain('</script>');
+    // The escaped content should be present as text
+    expect(result).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
+it('escapes HTML attributes in markdown input', () => {
+    const result = markdownToHtml('<img onerror="alert(1)" src=x>');
+    expect(result).not.toContain('<img');
+    // The escaped content should be present as text (quotes also escaped)
+    expect(result).toContain('&lt;img onerror=&quot;alert(1)&quot; src=x&gt;');
+  });
+
+it('escapes iframe tags in markdown input', () => {
+    const result = markdownToHtml('<iframe src="evil.com"></iframe>');
+    expect(result).not.toContain('<iframe');
+    expect(result).not.toContain('</iframe>');
+    // The escaped content should be present as text (quotes also escaped)
+    expect(result).toContain('&lt;iframe src=&quot;evil.com&quot;&gt;&lt;/iframe&gt;');
+  });
+
+  it('preserves normal markdown formatting', () => {
+    const result = markdownToHtml('# Heading\n\n**Bold** and *italic* text.');
+    expect(result).toContain('<h1>Heading</h1>');
+    expect(result).toContain('<b>Bold</b>');
+    expect(result).toContain('<i>italic</i>');
+  });
 });
 
 describe('formatBytes', () => {
@@ -172,6 +249,7 @@ describe('RFC-4180 CSV edge cases', () => {
 describe('XML escaping', () => {
   it('escapes special characters in text values', () => {
     const xml = jsonToXml({ title: 'a < b & c > "d"' });
+    // Only the text content is escaped; wrapper tags remain as XML tags
     expect(xml).toContain('<title>a &lt; b &amp; c &gt; &quot;d&quot;</title>');
     expect(xml).not.toContain('<title>a < b');
   });

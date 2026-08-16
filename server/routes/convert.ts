@@ -1,13 +1,30 @@
 import { Router } from "express";
 import { createReadStream } from "node:fs";
 import { parseUploadStream, cleanup, UploadError } from "../upload";
-import { convertFile, NoAudioStreamError, UnsupportedFormatError, UnsupportedConversionError } from "../convert";
+import { convertFile, NoAudioStreamError, UnsupportedFormatError, UnsupportedConversionError, InvalidOptionError } from "../convert";
+import { ServerBusyError } from "../ffmpeg/runner";
 import type { ParsedUpload } from "../upload";
+import { planConversion, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
+import { randomUUID } from "node:crypto";
+
+// Simple structured logger for conversion errors.
+function logError(context: Record<string, unknown>): void {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    requestId: context.requestId,
+    level: 'error',
+    ...context,
+  };
+  // Console output is structured JSON for log aggregation.
+  console.error(JSON.stringify(entry));
+}
 
 export const convertRouter = Router();
 
 // Actual file conversion via local ffmpeg. Multipart: file + category + sourceFormat + targetFormat + options(JSON string)
 convertRouter.post("/", async (req, res) => {
+  const requestId = randomUUID();
+  const startTime = Date.now();
   let upload: ParsedUpload | null = null;
   const controller = new AbortController();
 
@@ -19,12 +36,40 @@ convertRouter.post("/", async (req, res) => {
   try {
     upload = await parseUploadStream(req);
 
+    // Authoritative server-side validation of category, source format, and target format.
+    // Do not trust client-provided metadata.
+    const category = upload.category.toLowerCase();
+    const registryCategory = category as keyof typeof CONVERSION_REGISTRY;
+    if (!CONVERSION_REGISTRY[registryCategory]) {
+      throw new UnsupportedConversionError(category, upload.targetFormat);
+    }
+
+    const targetFormat = upload.targetFormat.toLowerCase();
+    const plan = planConversion(registryCategory, targetFormat);
+    if (plan.supported === false) {
+      throw new UnsupportedConversionError(category, targetFormat);
+    }
+
+    // Validate source format resolved from magic bytes / mime / filename against
+    // the registry. Client-provided sourceFormat is ignored. When the source is
+    // genuinely unknown (no magic bytes, unhelpful mime, no extension) we let it
+    // through — ffmpeg probes the input itself.
+    const sourceFormat = upload.sourceFormat.toLowerCase();
+    const spec = CONVERSION_REGISTRY[registryCategory];
+    if (sourceFormat && !spec.sourceFormats.includes(sourceFormat)) {
+      throw new UnsupportedConversionError(category, targetFormat);
+    }
+
+    // Validate options against allowed keys for this category/target
+    const validatedOpts = { ...upload.options };
+    // Options validation happens in convertFile -> validateOptions
+
     const { mime, result } = await convertFile(
       Buffer.alloc(0),
       {
         category: upload.category,
         targetFormat: upload.targetFormat,
-        ...upload.options,
+        ...validatedOpts,
       },
       upload.filePath,
       { signal: controller.signal }
@@ -57,13 +102,36 @@ convertRouter.post("/", async (req, res) => {
   } catch (err: unknown) {
     if (controller.signal.aborted) return; // client already gone; nothing to send
     const message = err instanceof Error ? err.message : "Conversion failed";
+    const durationMs = Date.now() - startTime;
+    
+    // Structured error logging with request context.
+    logError({
+      requestId,
+      category: upload?.category,
+      sourceFormat: upload?.sourceFormat,
+      targetFormat: upload?.targetFormat,
+      inputSize: upload?.size,
+      errorType: err?.constructor?.name,
+      httpStatus: err instanceof UploadError ? err.status :
+                  err instanceof ServerBusyError ? 503 :
+                  err instanceof InvalidOptionError ? 400 :
+                  err instanceof UnsupportedFormatError ||
+                  err instanceof UnsupportedConversionError ||
+                  err instanceof NoAudioStreamError ? 400 : 500,
+      durationMs,
+    });
+    
     if (err instanceof UploadError) {
       return res.status(err.status).json({ error: message });
+    }
+    if (err instanceof ServerBusyError) {
+      return res.status(503).json({ error: message });
     }
     const isClientError =
       err instanceof UnsupportedFormatError ||
       err instanceof UnsupportedConversionError ||
-      err instanceof NoAudioStreamError;
+      err instanceof NoAudioStreamError ||
+      err instanceof InvalidOptionError;
     res.status(isClientError ? 400 : 500).json({ error: message });
   } finally {
     if (upload) cleanup(upload.tempDir, upload.filePath);
