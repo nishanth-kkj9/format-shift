@@ -1,5 +1,5 @@
-import { TargetFormat, VideoConversionOptions } from '../types';
-import { planConversion } from '../core/conversionRegistry';
+import { TargetFormat, VideoConversionOptions } from "../types";
+import { planConversion } from "../core/conversionRegistry";
 
 // Convert Video format / Video to WEBM/MP4/GIF (browser path).
 // All video targets route to the FFmpeg server via the conversion registry for
@@ -16,21 +16,21 @@ export async function convertVideo(
 
   // If user selected audio format target from video (e.g. video -> WAV/MP3), it must
   // run on the server (registry marks video->audio as server engine). Refuse here.
-  const plan = planConversion('video', targetFormat);
-  if (plan.supported === false || plan.target.engine !== 'browser') {
+  const plan = planConversion("video", targetFormat);
+  if (plan.supported === false || plan.target.engine !== "browser") {
     throw new Error(`Video -> ${targetFormat} must run on the FFmpeg server`);
   }
 
   return new Promise((resolve, reject) => {
     const videoUrl = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'auto';
+    const video = document.createElement("video");
+    video.preload = "auto";
     video.muted = options.muteAudio;
     video.src = videoUrl;
 
     video.onerror = () => {
       URL.revokeObjectURL(videoUrl);
-      reject(new Error('Unable to load video file'));
+      reject(new Error("Unable to load video file"));
     };
 
     video.onloadedmetadata = () => {
@@ -38,7 +38,7 @@ export async function convertVideo(
       // Check for abort before starting
       if (abortSignal?.aborted) {
         URL.revokeObjectURL(videoUrl);
-        reject(new DOMException('Aborted', 'AbortError'));
+        reject(new DOMException("Aborted", "AbortError"));
         return;
       }
       const srcWidth = video.videoWidth;
@@ -48,12 +48,12 @@ export async function convertVideo(
       let targetWidth = srcWidth;
       let targetHeight = srcHeight;
       const preset = options.resolution;
-      if (preset && preset !== 'original') {
+      if (preset && preset !== "original") {
         const presets: Record<string, { w: number; h: number }> = {
-          '1080p': { w: 1920, h: 1080 },
-          '720p': { w: 1280, h: 720 },
-          '480p': { w: 854, h: 480 },
-          '360p': { w: 640, h: 360 },
+          "1080p": { w: 1920, h: 1080 },
+          "720p": { w: 1280, h: 720 },
+          "480p": { w: 854, h: 480 },
+          "360p": { w: 640, h: 360 },
         };
         const p = presets[preset];
         if (p && srcWidth > 0 && srcHeight > 0) {
@@ -66,17 +66,17 @@ export async function convertVideo(
         }
       }
 
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = targetWidth;
       canvas.height = targetHeight;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
 
       const fps = options.fps || 30;
       const canvasStream = canvas.captureStream(fps);
 
       // Never fall back to webm when the requested container is unsupported —
       // fail loudly so the caller routes to FFmpeg instead of mislabeling output.
-      const requestedType = targetFormat === 'mp4' ? 'video/mp4' : 'video/webm';
+      const requestedType = targetFormat === "mp4" ? "video/mp4" : "video/webm";
       if (!MediaRecorder.isTypeSupported(requestedType)) {
         URL.revokeObjectURL(videoUrl);
         reject(new Error(`This browser cannot record ${requestedType} (server conversion required)`));
@@ -91,16 +91,16 @@ export async function convertVideo(
 
       // Listen for abort to stop recording
       const handleAbort = () => {
-        if (mediaRecorder.state !== 'inactive') {
+        if (mediaRecorder.state !== "inactive") {
           mediaRecorder.stop();
         }
         URL.revokeObjectURL(videoUrl);
       };
-      abortSignal?.addEventListener('abort', handleAbort, { once: true });
+      abortSignal?.addEventListener("abort", handleAbort, { once: true });
 
       mediaRecorder.onstop = () => {
         onProgress?.(100);
-        abortSignal?.removeEventListener('abort', handleAbort);
+        abortSignal?.removeEventListener("abort", handleAbort);
         URL.revokeObjectURL(videoUrl);
         const finalBlob = new Blob(chunks, { type: requestedType });
         resolve({

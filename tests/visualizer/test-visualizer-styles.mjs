@@ -19,7 +19,7 @@ try {
   for (const s of STYLES) {
     await page.goto(base, { waitUntil: "networkidle" });
 
-    await page.setInputFiles('input[type="file"]', "test-2s.wav");
+    await page.setInputFiles('input[type="file"]', "tests/visualizer/test-2s.wav");
     await page.waitForSelector("text=/test-2s\\.wav/", { timeout: 5000 });
 
     const dropdown = page.locator("select").first();

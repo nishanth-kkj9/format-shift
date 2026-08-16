@@ -8,6 +8,11 @@ A browser-first conversion app built with React and TypeScript. FormatShift conv
 
 **Private by default for browser conversions · Batch processing · Live previews · Conversion history · ZIP downloads**
 
+![CI](https://img.shields.io/github/actions/workflow/status/nishanth-kkj9/format-shift/ci.yml?branch=main&label=CI)
+![Coverage](https://img.shields.io/codecov/c/github/nishanth-kkj9/format-shift)
+![License](https://img.shields.io/github/license/nishanth-kkj9/format-shift)
+![Node](https://img.shields.io/badge/node-%3E%3D20-green)
+
 </div>
 
 ---
@@ -19,7 +24,7 @@ FormatShift is a full-stack file conversion application designed around a **hybr
 1. A user drops one or more files into the browser.
 2. FormatShift detects the file category and source format automatically.
 3. Conversions that the browser can reliably perform stay **client-side** using Canvas, Web Audio, and browser APIs.
-4. Formats that need `ffmpeg` are sent to the local/server API and processed with `ffmpeg-static`.
+4. Formats that need `ffmpeg` are sent to the local/server API and processed with the resolved ffmpeg binary (system `ffmpeg`, or the bundled `ffmpeg-static` fallback in dev).
 5. The converted result is returned to the browser for preview and download.
 
 This approach reduces unnecessary uploads while still supporting media formats that browser APIs cannot reliably encode.
@@ -79,7 +84,7 @@ This approach reduces unnecessary uploads while still supporting media formats t
 - Markdown/text → HTML conversion.
 - Plain-text, Markdown and HTML document targets (all browser-side).
 
-> **Current implementation note:** data/document conversion is text-based and browser-side. There is no full PDF rendering engine, so PDF is accepted as an *input* source but is **not** offered as an output target — asking for a PDF target returns an explicit "unsupported" error rather than a fake file.
+> **Current implementation note:** data/document conversion is text-based and browser-side. There is no full PDF rendering engine, so PDF is accepted as an _input_ source but is **not** offered as an output target — asking for a PDF target returns an explicit "unsupported" error rather than a fake file.
 
 ### UX
 
@@ -151,25 +156,25 @@ The upload layer also performs category-specific size checks and best-effort mag
 
 All targets below are defined once in `src/core/conversionRegistry.ts`; the UI, detection, server endpoint and code templates all derive from it. No conversion is advertised that the app cannot genuinely perform.
 
-| Category | Targets | Browser engine | Server (FFmpeg) engine |
-|---|---|---|---|
-| **Image** | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF | JPG, JPEG, PNG, WEBP, SVG | GIF, BMP, ICO, AVIF (and any browser target via API) |
-| **Audio** | WAV, MP3, OGG, AAC, M4A, FLAC, MP4, WEBM | WAV, MP4/WEBM (spectrum visualizer) | MP3, OGG, AAC, M4A, FLAC |
-| **Video** | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server) | All |
-| **Data** | JSON, CSV, TSV, XML, YAML | All | — |
-| **Document** | TXT, MD, HTML | All (PDF/TXT/MD/HTML accepted as *sources*) | — |
+| Category     | Targets                                                      | Browser engine                              | Server (FFmpeg) engine                               |
+| ------------ | ------------------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------- |
+| **Image**    | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF               | JPG, JPEG, PNG, WEBP, SVG                   | GIF, BMP, ICO, AVIF (and any browser target via API) |
+| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC, MP4, WEBM                     | WAV, MP4/WEBM (spectrum visualizer)         | MP3, OGG, AAC, M4A, FLAC                             |
+| **Video**    | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server)                              | All                                                  |
+| **Data**     | JSON, CSV, TSV, XML, YAML                                    | All                                         | —                                                    |
+| **Document** | TXT, MD, HTML                                                | All (PDF/TXT/MD/HTML accepted as _sources_) | —                                                    |
 
 ### Server upload limits
 
 Server-side uploads are limited by category:
 
 | Category | Maximum upload size |
-|---|---:|
-| Image | 50 MB |
-| Audio | 100 MB |
-| Video | 200 MB |
-| Document | 10 MB |
-| Data | 10 MB |
+| -------- | ------------------: |
+| Image    |               50 MB |
+| Audio    |              100 MB |
+| Video    |              200 MB |
+| Document |               10 MB |
+| Data     |               10 MB |
 
 The multipart parser also has an overall 200 MB Busboy file-size limit.
 
@@ -259,17 +264,17 @@ The repository includes `.env.example` for environment configuration. Copy it to
 
 ## 📜 NPM Scripts
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Start the Vite development server |
-| `npm run server` | Start the Express API with `tsx` |
-| `npm run dev:all` | Start Vite and Express together |
-| `npm run build` | Build the frontend and bundle the API into `dist/server.cjs` |
-| `npm start` | Start the production server |
-| `npm run preview` | Preview the Vite production build |
-| `npm run lint` | TypeScript type-check with `tsc --noEmit` |
-| `npm test` | Run the Vitest test suite |
-| `npm run clean` | Remove generated build output |
+| Command           | Purpose                                                      |
+| ----------------- | ------------------------------------------------------------ |
+| `npm run dev`     | Start the Vite development server                            |
+| `npm run server`  | Start the Express API with `tsx`                             |
+| `npm run dev:all` | Start Vite and Express together                              |
+| `npm run build`   | Build the frontend and bundle the API into `dist/server.cjs` |
+| `npm start`       | Start the production server                                  |
+| `npm run preview` | Preview the Vite production build                            |
+| `npm run lint`    | TypeScript type-check with `tsc --noEmit`                    |
+| `npm test`        | Run the Vitest test suite                                    |
+| `npm run clean`   | Remove generated build output                                |
 
 ---
 
@@ -300,13 +305,13 @@ Content-Type: multipart/form-data
 
 Multipart fields:
 
-| Field | Required | Description |
-|---|---|---|
-| `file` | Yes | Source file |
-| `category` | Yes | `image`, `audio`, `video`, `document`, or `data` |
-| `sourceFormat` | Optional | Source extension/format |
-| `targetFormat` | Yes | Requested output format |
-| `options` | Optional | JSON-encoded conversion options |
+| Field          | Required | Description                                      |
+| -------------- | -------- | ------------------------------------------------ |
+| `file`         | Yes      | Source file                                      |
+| `category`     | Yes      | `image`, `audio`, `video`, `document`, or `data` |
+| `sourceFormat` | Optional | Source extension/format                          |
+| `targetFormat` | Yes      | Requested output format                          |
+| `options`      | Optional | JSON-encoded conversion options                  |
 
 Successful responses return the converted binary with an appropriate `Content-Type` and an attachment filename.
 
@@ -497,9 +502,42 @@ FormatShift is a file-processing application, so a public deployment should stil
 
 ---
 
+## 🔒 Security
+
+Security fixes are a priority. Please report vulnerabilities privately instead
+of opening a public issue so they can be fixed before disclosure.
+
+- **Header hardening:** served via `helmet` with a Content Security Policy.
+  `X-Frame-Options: DENY`, `nosniff`, and a strict referrer policy are applied
+  to every response.
+- **HSTS:** opt-in via `ENABLE_HSTS=1`. Only enable it when the site is served
+  over HTTPS (usually behind a TLS-terminating proxy).
+- **Reverse proxies:** set `TRUST_PROXY=1` only when behind a trusted proxy
+  (nginx, Cloudflare). Otherwise the server may trust spoofed `X-Forwarded-For`
+  headers.
+- **Rate limiting:** per-IP (30 req/min) and a global aggregate backstop
+  (60 req/min) on `/api/convert`, so a distributed burst cannot exhaust every
+  ffmpeg slot.
+- **Option allowlist:** the convert API accepts only known option keys (zod
+  `.strict()`). Unknown keys such as `-map` are rejected, never forwarded to
+  ffmpeg.
+- **ffmpeg safety:** each job gets a fresh temp dir, a bounded concurrency
+  semaphore + queue (over capacity → HTTP 503), a hard timeout, and cleanup on
+  success, error, and client disconnect. Error messages are sanitized (no
+  absolute paths, no memory addresses).
+- **Downloads:** converted files are served with
+  `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so
+  converted SVG/HTML can never be rendered inline.
+- **Container:** the Docker image runs as a non-root user and exposes a
+  healthcheck.
+- **Temp files:** uploaded files are written to a temporary directory and
+  removed after each request.
+
+---
+
 ## 📄 License
 
-No license file is currently included in the repository. If you plan to distribute or accept external contributions, add an explicit open-source license before treating the project as licensed for reuse.
+Released under the [MIT License](LICENSE).
 
 ---
 

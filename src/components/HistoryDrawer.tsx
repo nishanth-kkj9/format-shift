@@ -1,8 +1,8 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, History, Download, ArrowRight } from 'lucide-react';
-import { ConversionHistoryItem } from '../types';
-import { formatBytes } from '../utils/converter';
+import React from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { X, History, Download, ArrowRight } from "lucide-react";
+import { ConversionHistoryItem } from "../types";
+import { formatBytes } from "../utils/converter";
 
 interface HistoryDrawerProps {
   isOpen: boolean;
@@ -11,12 +11,7 @@ interface HistoryDrawerProps {
   onClearHistory: () => void;
 }
 
-export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
-  isOpen,
-  onClose,
-  history,
-  onClearHistory,
-}) => {
+export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose, history, onClearHistory }) => {
   const totalSavedBytes = history.reduce((acc, h) => acc + Math.max(0, h.originalSize - h.convertedSize), 0);
 
   return (
@@ -24,7 +19,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
       {isOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -33,20 +28,18 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           />
 
           {/* Drawer Body */}
-          <motion.div 
-            initial={{ x: '100%' }}
+          <motion.div
+            initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="relative z-10 w-full max-w-md bg-slate-900 text-white h-full shadow-2xl border-l border-white/10 flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-900/80">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">
-                  Conversion History
-                </h3>
+                <h3 className="text-base font-bold text-white">Conversion History</h3>
               </div>
               <button
                 onClick={onClose}
@@ -60,14 +53,14 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             {history.length > 0 && (
               <div className="p-4 bg-amber-500/10 border-b border-amber-500/20 flex justify-between items-center text-xs">
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Converted</span>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                    Total Converted
+                  </span>
                   <span className="font-bold text-white">{history.length} Files</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Storage Saved</span>
-                  <span className="font-extrabold text-emerald-400">
-                    {formatBytes(totalSavedBytes)}
-                  </span>
+                  <span className="font-extrabold text-emerald-400">{formatBytes(totalSavedBytes)}</span>
                 </div>
                 <button
                   onClick={onClearHistory}
@@ -98,12 +91,12 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                       <div className="flex items-center gap-1.5 text-xs font-bold text-white truncate">
                         <span className="truncate">{item.originalName}</span>
                         <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span className="text-indigo-400 uppercase">
-                          {item.targetFormat}
-                        </span>
+                        <span className="text-indigo-400 uppercase">{item.targetFormat}</span>
                       </div>
                       <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
-                        <span>{formatBytes(item.originalSize)} → {formatBytes(item.convertedSize)}</span>
+                        <span>
+                          {formatBytes(item.originalSize)} → {formatBytes(item.convertedSize)}
+                        </span>
                         <span>•</span>
                         <span>{item.timestamp}</span>
                       </div>
@@ -121,7 +114,6 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                 ))
               )}
             </div>
-
           </motion.div>
         </div>
       )}

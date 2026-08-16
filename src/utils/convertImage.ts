@@ -1,29 +1,29 @@
-import { TargetFormat, ImageConversionOptions } from '../types';
-import { SOCIAL_PRESETS } from './detect';
-import { getMimeForTarget } from '../core/conversionRegistry';
+import { TargetFormat, ImageConversionOptions } from "../types";
+import { SOCIAL_PRESETS } from "./detect";
+import { getMimeForTarget } from "../core/conversionRegistry";
 
 export { dataUrlToBlob };
 
 // Targets that must run on the FFmpeg server — the browser canvas cannot
 // reliably encode these. Rejecting here prevents silently mislabeled output.
-const SERVER_ONLY_IMAGE_TARGETS = new Set(['gif', 'bmp', 'ico', 'avif']);
+const SERVER_ONLY_IMAGE_TARGETS = new Set(["gif", "bmp", "ico", "avif"]);
 
 // Browser-supported targets (Canvas can encode these).
-const BROWSER_IMAGE_TARGETS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg']);
+const BROWSER_IMAGE_TARGETS = new Set(["png", "jpg", "jpeg", "webp", "svg"]);
 
 function assertBlobMatches(blob: Blob | null, target: string): void {
-  const expected = getMimeForTarget('image', target);
+  const expected = getMimeForTarget("image", target);
   if (!blob) {
     throw new Error(`This browser cannot encode .${target} images (no blob output).`);
   }
   if (expected && blob.type !== expected) {
-    throw new Error(`This browser cannot encode .${target} images (got ${blob.type || 'unknown'} instead).`);
+    throw new Error(`This browser cannot encode .${target} images (got ${blob.type || "unknown"} instead).`);
   }
 }
 
 function dataUrlToBlob(dataUrl: string): Blob {
-  const arr = dataUrl.split(',');
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+  const arr = dataUrl.split(",");
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
@@ -53,11 +53,11 @@ export async function convertImage(
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read image file'));
+    reader.onerror = () => reject(new Error("Failed to read image file"));
     reader.onload = () => {
       onProgress?.(30);
       const img = new Image();
-      img.onerror = () => reject(new Error('Invalid image data'));
+      img.onerror = () => reject(new Error("Invalid image data"));
       img.onload = () => {
         onProgress?.(50);
         let width = img.width;
@@ -65,23 +65,27 @@ export async function convertImage(
 
         // Apply Social Media Preset dimensions if selected
         let presetDim: { w: number; h: number } | null = null;
-        if (options.socialPreset && options.socialPreset !== 'custom' && SOCIAL_PRESETS[options.socialPreset]) {
+        if (
+          options.socialPreset &&
+          options.socialPreset !== "custom" &&
+          SOCIAL_PRESETS[options.socialPreset]
+        ) {
           presetDim = SOCIAL_PRESETS[options.socialPreset];
         }
 
         if (presetDim) {
           // Preset target canvas dimensions
-          const canvas = document.createElement('canvas');
+          const canvas = document.createElement("canvas");
           canvas.width = presetDim.w;
           canvas.height = presetDim.h;
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext("2d");
           if (!ctx) {
-            reject(new Error('Could not get canvas 2d context'));
+            reject(new Error("Could not get canvas 2d context"));
             return;
           }
 
           // Fill background
-          ctx.fillStyle = options.bgColor || '#0f172a';
+          ctx.fillStyle = options.bgColor || "#0f172a";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
           // Calculate aspect fit scale to center image on canvas
@@ -107,10 +111,10 @@ export async function convertImage(
           }
 
           const qualityVal = (options.quality || 85) / 100;
-          let mimeType = 'image/jpeg';
+          let mimeType = "image/jpeg";
           const tgt = targetFormat.toLowerCase();
-          if (tgt === 'png') mimeType = 'image/png';
-          else if (tgt === 'webp') mimeType = 'image/webp';
+          if (tgt === "png") mimeType = "image/png";
+          else if (tgt === "webp") mimeType = "image/webp";
 
           canvas.toBlob(
             (blob) => {
@@ -142,10 +146,10 @@ export async function convertImage(
           height = options.maxHeight;
         }
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
         if (!ctx) {
-          reject(new Error('Could not get canvas 2d context'));
+          reject(new Error("Could not get canvas 2d context"));
           return;
         }
 
@@ -187,19 +191,19 @@ export async function convertImage(
         onProgress?.(80);
 
         // Determine target MIME type for browser-supported targets only
-        let mimeType = 'image/jpeg';
+        let mimeType = "image/jpeg";
         const tgt = targetFormat.toLowerCase();
-        if (tgt === 'png') mimeType = 'image/png';
-        else if (tgt === 'webp') mimeType = 'image/webp';
-        else if (tgt === 'svg') mimeType = 'image/svg+xml';
+        if (tgt === "png") mimeType = "image/png";
+        else if (tgt === "webp") mimeType = "image/webp";
+        else if (tgt === "svg") mimeType = "image/svg+xml";
 
         // Special handling for SVG wrapper format
-        if (tgt === 'svg') {
-          const dataUrl = canvas.toDataURL('image/png');
+        if (tgt === "svg") {
+          const dataUrl = canvas.toDataURL("image/png");
           const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">
             <image href="${dataUrl}" width="${canvas.width}" height="${canvas.height}" />
           </svg>`;
-          const blob = new Blob([svgString], { type: 'image/svg+xml' });
+          const blob = new Blob([svgString], { type: "image/svg+xml" });
           onProgress?.(100);
           resolve({ blob, dimensions: { width: canvas.width, height: canvas.height } });
           return;

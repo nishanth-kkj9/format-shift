@@ -32,11 +32,37 @@ export class UploadError extends Error {
 }
 
 const ALLOWED_MIME: Record<string, string[]> = {
-  image: ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/x-icon", "image/svg+xml", "image/avif"],
-  audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/mp4", "audio/flac", "audio/x-wav", "audio/x-m4a", "audio/webm"],
+  image: [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+    "image/bmp",
+    "image/x-icon",
+    "image/svg+xml",
+    "image/avif",
+  ],
+  audio: [
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg",
+    "audio/aac",
+    "audio/mp4",
+    "audio/flac",
+    "audio/x-wav",
+    "audio/x-m4a",
+    "audio/webm",
+  ],
   video: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/x-flv"],
   document: ["application/pdf", "text/plain", "text/markdown", "text/html"],
-  data: ["application/json", "text/csv", "application/xml", "text/xml", "text/yaml", "text/tab-separated-values"],
+  data: [
+    "application/json",
+    "text/csv",
+    "application/xml",
+    "text/xml",
+    "text/yaml",
+    "text/tab-separated-values",
+  ],
 };
 
 const MAX_SIZES: Record<string, number> = {
@@ -109,9 +135,10 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
     const headerCategory = (req.headers["x-category"] as string) || "";
     const queryCategory = url.searchParams.get("category") || "";
     const categoryFromMeta = (headerCategory || queryCategory || "").toLowerCase();
-    const categoryMaxSize = categoryFromMeta && MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]
-      ? MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]
-      : GLOBAL_MAX_SIZE;
+    const categoryMaxSize =
+      categoryFromMeta && MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]
+        ? MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]
+        : GLOBAL_MAX_SIZE;
 
     const busboy = Busboy({
       headers: req.headers,
@@ -120,48 +147,51 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
       limits: { fileSize: categoryMaxSize + 1 },
     });
 
-    busboy.on("file", (_name, stream, info) => {
-      mimetype = info.mimeType;
-      originalFilename = info.filename || "upload.bin";
-      filePath = join(tempDir, `input-${randomBytes(8).toString("hex")}.bin`);
-      const writeStream = createWriteStream(filePath);
+    busboy.on(
+      "file",
+      (_name: string, stream: NodeJS.ReadableStream, info: { mimeType: string; filename: string }) => {
+        mimetype = info.mimeType;
+        originalFilename = info.filename || "upload.bin";
+        filePath = join(tempDir, `input-${randomBytes(8).toString("hex")}.bin`);
+        const writeStream = createWriteStream(filePath);
 
-      // Track total size + keep the first 8KB for magic-byte sniffing.
-      stream.on("data", (chunk: Buffer) => {
-        size += chunk.length;
-        if (headBytes < 8192) {
-          const take = Math.min(8192 - headBytes, chunk.length);
-          head.push(chunk.subarray(0, take));
-          headBytes += take;
-        }
-      });
+        // Track total size + keep the first 8KB for magic-byte sniffing.
+        stream.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (headBytes < 8192) {
+            const take = Math.min(8192 - headBytes, chunk.length);
+            head.push(chunk.subarray(0, take));
+            headBytes += take;
+          }
+        });
 
-      // Busboy fires this when the file stream is truncated at the size cap.
-      stream.on("limit", () => {
-        if (!abortError) {
-          abortError = new UploadError(
-            `File too large for ${categoryFromMeta || "upload"} category (max ${categoryMaxSize / 1024 / 1024}MB)`,
-            413
-          );
-        }
-      });
+        // Busboy fires this when the file stream is truncated at the size cap.
+        stream.on("limit", () => {
+          if (!abortError) {
+            abortError = new UploadError(
+              `File too large for ${categoryFromMeta || "upload"} category (max ${categoryMaxSize / 1024 / 1024}MB)`,
+              413
+            );
+          }
+        });
 
-      // pipeline() keeps memory O(chunk) and only resolves after every byte has
-      // been flushed to the write stream — parseUploadStream never returns while
-      // the file is still being written. Errors are captured into abortError.
-      const writeDone = pipeline(stream, writeStream).catch((err: Error) => {
-        if (!abortError) {
-          abortError = new UploadError(`Failed to write upload to disk: ${err.message}`, 500);
-        }
-      });
-      writePipelines.push(writeDone);
-    });
+        // pipeline() keeps memory O(chunk) and only resolves after every byte has
+        // been flushed to the write stream — parseUploadStream never returns while
+        // the file is still being written. Errors are captured into abortError.
+        const writeDone = pipeline(stream, writeStream).catch((err: Error) => {
+          if (!abortError) {
+            abortError = new UploadError(`Failed to write upload to disk: ${err.message}`, 500);
+          }
+        });
+        writePipelines.push(writeDone);
+      }
+    );
 
-    busboy.on("field", (name, val) => {
+    busboy.on("field", (name: string, val: string) => {
       fields[name] = val;
     });
 
-    busboy.on("error", (err) => {
+    busboy.on("error", (err: Error) => {
       if (!abortError) {
         const isSizeLimit = /file size|size limit/i.test(err.message);
         abortError = new UploadError(err.message, isSizeLimit ? 413 : 400);
@@ -193,16 +223,14 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
     // category allowlist. Text formats without magic bytes are allowed through
     // when their declared MIME is in the allowlist.
     let detected: { ext: string; mime: string } | null = null;
+    // fileTypeFromBuffer returns FileTypeResult | undefined; normalize to our type
     if (ALLOWED_MIME[cat]) {
-      detected = await fileTypeFromBuffer(Buffer.concat(head));
+      const ft = await fileTypeFromBuffer(Buffer.concat(head));
+      detected = ft ? { ext: ft.ext, mime: ft.mime } : null;
       if (detected && !ALLOWED_MIME[cat].includes(detected.mime)) {
         throw new UploadError(`File content (${detected.mime}) does not match category ${category}`);
       }
-      if (
-        !detected &&
-        mimetype !== "application/octet-stream" &&
-        !ALLOWED_MIME[cat].includes(mimetype)
-      ) {
+      if (!detected && mimetype !== "application/octet-stream" && !ALLOWED_MIME[cat].includes(mimetype)) {
         throw new UploadError(`File type ${mimetype} not allowed for category ${category}`);
       }
     }

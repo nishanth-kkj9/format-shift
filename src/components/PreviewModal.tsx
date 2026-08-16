@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Eye, Download, ArrowRight, Music, Film, FileCode } from 'lucide-react';
-import { ConversionItem } from '../types';
-import { formatBytes } from '../utils/converter';
+import React, { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { X, Eye, Download, ArrowRight, Music, Film, FileCode } from "lucide-react";
+import { ConversionItem } from "../types";
+import { formatBytes } from "../utils/converter";
 
 interface PreviewModalProps {
   item: ConversionItem | null;
@@ -11,20 +11,15 @@ interface PreviewModalProps {
   onDownload: (item: ConversionItem) => void;
 }
 
-export const PreviewModal: React.FC<PreviewModalProps> = ({
-  item,
-  isOpen,
-  onClose,
-  onDownload,
-}) => {
+export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClose, onDownload }) => {
   const [sliderPos, setSliderPos] = useState(50);
-  const [convertedText, setConvertedText] = useState<string>('');
+  const [convertedText, setConvertedText] = useState<string>("");
 
   const originalUrl = useMemo(
-    () => item?.previewUrl || (item ? URL.createObjectURL(item.file) : ''),
+    () => item?.previewUrl || (item ? URL.createObjectURL(item.file) : ""),
     [item?.previewUrl, item?.file]
   );
-  const convertedUrl = item?.convertedUrl || '';
+  const convertedUrl = item?.convertedUrl || "";
 
   // Clean up object URLs when component unmounts or item changes
   useEffect(() => {
@@ -39,10 +34,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
   // Read the converted blob text for data/document previews
   useEffect(() => {
-    if (item && (item.category === 'data' || item.category === 'document') && item.convertedBlob) {
-      item.convertedBlob.text().then(setConvertedText).catch(() => setConvertedText(''));
+    if (item && (item.category === "data" || item.category === "document") && item.convertedBlob) {
+      item.convertedBlob
+        .text()
+        .then(setConvertedText)
+        .catch(() => setConvertedText(""));
     } else {
-      setConvertedText('');
+      setConvertedText("");
     }
   }, [item?.category, item?.convertedBlob]);
 
@@ -71,7 +69,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
             className="relative z-10 w-full max-w-4xl bg-slate-900 text-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden glass-card flex flex-col max-h-[90vh]"
           >
             {/* Header */}
@@ -84,13 +82,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   <h3 className="text-sm font-black text-white flex items-center gap-2">
                     <span className="truncate max-w-[200px]">{item.name}</span>
                     <ArrowRight className="w-4 h-4 text-slate-400" />
-                    <span className="text-indigo-400 font-black uppercase">
-                      {item.targetFormat}
-                    </span>
+                    <span className="text-indigo-400 font-black uppercase">{item.targetFormat}</span>
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Live Quality & Format Comparison
-                  </p>
+                  <p className="text-xs text-slate-400">Live Quality & Format Comparison</p>
                 </div>
               </div>
               <button
@@ -112,25 +106,28 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Converted File</span>
                 <span className="font-bold text-emerald-400">
-                  {item.convertedSize ? formatBytes(item.convertedSize) : 'N/A'} ({item.targetFormat.toUpperCase()})
+                  {item.convertedSize ? formatBytes(item.convertedSize) : "N/A"} (
+                  {item.targetFormat.toUpperCase()})
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-bold">Size Delta / Savings</span>
-                <span className={`font-bold ${pctSaved > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {pctSaved > 0 ? `Saved ${pctSaved}% (${formatBytes(Math.abs(sizeDiff))})` : `${pctSaved}% difference`}
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                  Size Delta / Savings
+                </span>
+                <span className={`font-bold ${pctSaved > 0 ? "text-emerald-400" : "text-amber-400"}`}>
+                  {pctSaved > 0
+                    ? `Saved ${pctSaved}% (${formatBytes(Math.abs(sizeDiff))})`
+                    : `${pctSaved}% difference`}
                 </span>
               </div>
             </div>
 
             {/* Main Content Area */}
             <div className="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center min-h-[300px]">
-              
               {/* IMAGE COMPARISON (Interactive Split Slider) */}
-              {item.category === 'image' && (
+              {item.category === "image" && (
                 <div className="w-full flex flex-col items-center">
                   <div className="relative w-full max-w-2xl h-[360px] rounded-2xl overflow-hidden border border-white/15 bg-checkered select-none shadow-2xl">
-                    
                     {/* Converted Image (Base Layer) */}
                     <img
                       src={convertedUrl || originalUrl}
@@ -139,15 +136,12 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     />
 
                     {/* Original Image (Clipped Layer on Top) */}
-                    <div
-                      className="absolute inset-0 overflow-hidden"
-                      style={{ width: `${sliderPos}%` }}
-                    >
+                    <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
                       <img
                         src={originalUrl}
                         alt="Original Source"
                         className="absolute inset-0 w-full h-full object-contain pointer-events-none max-w-none"
-                        style={{ width: '100%', height: '100%' }}
+                        style={{ width: "100%", height: "100%" }}
                       />
                     </div>
 
@@ -187,7 +181,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               )}
 
               {/* AUDIO PLAYER COMPARISON */}
-              {item.category === 'audio' && (
+              {item.category === "audio" && (
                 <div className="w-full max-w-md space-y-5">
                   <div className="p-4 rounded-2xl border border-white/10 bg-white/5 space-y-2">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
@@ -214,7 +208,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               )}
 
               {/* VIDEO PLAYER COMPARISON */}
-              {item.category === 'video' && (
+              {item.category === "video" && (
                 <div className="w-full max-w-xl space-y-4">
                   <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black">
                     <video
@@ -224,23 +218,26 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     />
                   </div>
                   <p className="text-xs text-slate-400 text-center font-medium">
-                    <Film className="w-3.5 h-3.5 inline mr-1 text-indigo-400" /> Previewing converted video stream
+                    <Film className="w-3.5 h-3.5 inline mr-1 text-indigo-400" /> Previewing converted video
+                    stream
                   </p>
                 </div>
               )}
 
               {/* DATA / DOCUMENT CODE PREVIEW */}
-              {(item.category === 'data' || item.category === 'document') && (
+              {(item.category === "data" || item.category === "document") && (
                 <div className="w-full space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
                     <FileCode className="w-4 h-4 text-emerald-400" /> Converted Output Snippet
                   </div>
                   <div className="p-4 rounded-2xl border border-white/10 bg-slate-950 font-mono text-xs text-emerald-400 max-h-[300px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                    {convertedText || (item.convertedBlob ? 'Formatted file output generated successfully.' : 'Processing data payload...')}
+                    {convertedText ||
+                      (item.convertedBlob
+                        ? "Formatted file output generated successfully."
+                        : "Processing data payload...")}
                   </div>
                 </div>
               )}
-
             </div>
 
             {/* Footer with Download Button */}
@@ -265,7 +262,6 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 </motion.button>
               </div>
             </div>
-
           </motion.div>
         </div>
       )}

@@ -1,10 +1,10 @@
-import React from 'react';
-import { RefreshCw, Code2, History, Sparkles, Sun, Moon, FileText } from 'lucide-react';
-import { FileCategory } from '../types';
+import React from "react";
+import { RefreshCw, Code2, History, Sun, Moon, FileText } from "lucide-react";
+import { FileCategory } from "../types";
 
 interface HeaderProps {
-  selectedCategory: FileCategory | 'all';
-  onSelectCategory: (cat: FileCategory | 'all') => void;
+  selectedCategory: FileCategory | "all";
+  onSelectCategory: (cat: FileCategory | "all") => void;
   onOpenHistory: () => void;
   onOpenCodeModal: () => void;
   onOpenFormatGuide: () => void;
@@ -23,19 +23,18 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   historyCount,
 }) => {
-  const categories: { id: FileCategory | 'all'; label: string; icon: string }[] = [
-    { id: 'all', label: 'All Formats', icon: '✨' },
-    { id: 'image', label: 'Images', icon: '🖼️' },
-    { id: 'audio', label: 'Audio', icon: '🎵' },
-    { id: 'video', label: 'Video', icon: '🎬' },
-    { id: 'data', label: 'Data', icon: '📊' },
-    { id: 'document', label: 'Docs', icon: '📄' },
+  const categories: { id: FileCategory | "all"; label: string; icon: string }[] = [
+    { id: "all", label: "All Formats", icon: "✨" },
+    { id: "image", label: "Images", icon: "🖼️" },
+    { id: "audio", label: "Audio", icon: "🎵" },
+    { id: "video", label: "Video", icon: "🎬" },
+    { id: "data", label: "Data", icon: "📊" },
+    { id: "document", label: "Docs", icon: "📄" },
   ];
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/70 border-b border-white/10 shadow-2xl transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        
         {/* Brand / Logo */}
         <div className="flex items-center gap-3">
           <div className="relative group">
@@ -47,7 +46,10 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-black tracking-tight text-white">
-                Format<span className="text-indigo-400 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">Shift</span>
+                Format
+                <span className="text-indigo-400 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
+                  Shift
+                </span>
               </h1>
               <span className="text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 uppercase shadow-sm">
                 PRO
@@ -69,8 +71,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => onSelectCategory(cat.id)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] scale-[1.02]'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] scale-[1.02]"
+                    : "text-slate-300 hover:text-white hover:bg-white/10"
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -82,7 +84,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Tools & Actions */}
         <div className="flex items-center gap-2">
-          
           {/* Format Guide */}
           <button
             onClick={onOpenFormatGuide}
@@ -124,9 +125,12 @@ export const Header: React.FC<HeaderProps> = ({
             title="Toggle Light/Dark Theme"
             className="p-2 rounded-xl border border-white/10 glass-input text-amber-400 hover:bg-white/10 transition-colors cursor-pointer"
           >
-            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-300" />}
+            {isDark ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-300" />
+            )}
           </button>
-
         </div>
       </div>
 
@@ -140,8 +144,8 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onSelectCategory(cat.id)}
               className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
                 isActive
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-white/5 text-slate-300 border border-white/10'
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-white/5 text-slate-300 border border-white/10"
               }`}
             >
               <span>{cat.icon}</span>

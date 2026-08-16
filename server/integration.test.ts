@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { app } from "../server";
+import { app } from "./app";
 import type { Server } from "node:http";
 import { readdirSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -38,10 +38,10 @@ function postConvert(body: Blob, filename: string, category = "image", target = 
   form.append("category", category);
   form.append("targetFormat", target);
   form.append("options", "{}");
-  return fetch(`${base}/api/convert`, { 
-    method: "POST", 
+  return fetch(`${base}/api/convert`, {
+    method: "POST",
     body: form,
-    headers: { "x-category": category }
+    headers: { "x-category": category },
   });
 }
 
@@ -56,10 +56,10 @@ function postConvertOrdered(body: Blob, filename: string, fields: Record<string,
       form.append(key, value as string);
     }
   }
-  return fetch(`${base}/api/convert`, { 
-    method: "POST", 
+  return fetch(`${base}/api/convert`, {
+    method: "POST",
     body: form,
-    headers: { "x-category": category }
+    headers: { "x-category": category },
   });
 }
 
@@ -262,14 +262,41 @@ describe("Server-side source conversions (source-format validation)", () => {
 
   beforeAll(() => {
     fixtureDir = mkdtempSync(join(tmpdir(), "fs-fix-"));
-    const run = (args: string[]) =>
-      execFileSync("ffmpeg", ["-loglevel", "error", "-y", ...args]);
-    run(["-f", "lavfi", "-i", "sine=frequency=440:duration=0.2", "-c:a", "libmp3lame", join(fixtureDir, "tone.mp3")]);
-    run(["-f", "lavfi", "-i", "sine=frequency=440:duration=0.2", "-c:a", "pcm_s16le", join(fixtureDir, "tone.wav")]);
+    const run = (args: string[]) => execFileSync("ffmpeg", ["-loglevel", "error", "-y", ...args]);
     run([
-      "-f", "lavfi", "-i", "sine=frequency=440:duration=0.2",
-      "-f", "lavfi", "-i", "color=c=black:s=64x64",
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=0.2",
+      "-c:a",
+      "libmp3lame",
+      join(fixtureDir, "tone.mp3"),
+    ]);
+    run([
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=0.2",
+      "-c:a",
+      "pcm_s16le",
+      join(fixtureDir, "tone.wav"),
+    ]);
+    run([
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=0.2",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x64",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
       join(fixtureDir, "tone.mp4"),
     ]);
     toneMp3 = readFileSync(join(fixtureDir, "tone.mp3"));

@@ -8,18 +8,18 @@
 //  - gradient color spread around the ring (all hues present)
 //  - beat pulse magnitude on ring radius (subtle, 2-5%)
 // Usage: node scripts/visual-probe-analyze.mjs <png...>
-import { chromium } from 'playwright';
-import { readFileSync } from 'node:fs';
+import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 
 const files = process.argv.slice(2);
 if (files.length === 0) {
-  console.error('usage: node scripts/visual-probe-analyze.mjs <png1> <png2> ...');
+  console.error("usage: node scripts/visual-probe-analyze.mjs <png1> <png2> ...");
   process.exit(1);
 }
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
-await page.setContent('<canvas id=c></canvas>');
+await page.setContent("<canvas id=c></canvas>");
 await page.waitForFunction(() => {
   // ensure fonts not needed; just canvas ready
   return true;
@@ -27,15 +27,15 @@ await page.waitForFunction(() => {
 
 const results = [];
 for (const file of files) {
-  const b64 = readFileSync(file).toString('base64');
+  const b64 = readFileSync(file).toString("base64");
   const m = await page.evaluate(async (dataUrl) => {
     const img = new Image();
     img.src = dataUrl;
     await img.decode();
-    const canvas = document.getElementById('c');
+    const canvas = document.getElementById("c");
     canvas.width = img.width;
     canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0);
     const { width, height } = canvas;
     const data = ctx.getImageData(0, 0, width, height).data;
@@ -145,18 +145,20 @@ for (const file of files) {
       sectorLum,
       hueCounts,
     };
-  }, 'data:image/png;base64,' + b64);
+  }, "data:image/png;base64," + b64);
   results.push({ file, ...m });
 }
 
 for (const r of results) {
-  const sector = r.sectorLum.map((v, i) => `${(i * 45).toString().padStart(3)}°:${v.toFixed(1)}`).join(' ');
+  const sector = r.sectorLum.map((v, i) => `${(i * 45).toString().padStart(3)}°:${v.toFixed(1)}`).join(" ");
   const hue = Object.entries(r.hueCounts)
-    .filter(([k]) => k !== 'total')
+    .filter(([k]) => k !== "total")
     .map(([k, v]) => `${k}=${v}`)
-    .join(' ');
+    .join(" ");
   console.log(`\n== ${r.file}`);
-  console.log(`  bgLum=${r.bgLum.toFixed(1)} maxLum=${r.maxLum.toFixed(0)} brightFrac=${(r.brightFrac * 100).toFixed(1)}% farBright=${(r.farBrightFrac * 100).toFixed(2)}%`);
+  console.log(
+    `  bgLum=${r.bgLum.toFixed(1)} maxLum=${r.maxLum.toFixed(0)} brightFrac=${(r.brightFrac * 100).toFixed(1)}% farBright=${(r.farBrightFrac * 100).toFixed(2)}%`
+  );
   console.log(`  ring r=${r.bestR} density=${(r.bestDensity * 100).toFixed(0)}%`);
   console.log(`  sectors: ${sector}`);
   console.log(`  hues: ${hue}`);
@@ -171,7 +173,9 @@ if (results.length > 1) {
   const variance = radii.reduce((s, v) => s + (v - mean) ** 2, 0) / radii.length;
   const drift = Math.max(...radii) - Math.min(...radii);
   console.log(`\n== BATCH AGGREGATE (${results.length} frames)`);
-  console.log(`  ring r: mean=${mean.toFixed(1)} min=${Math.min(...radii)} max=${Math.max(...radii)} drift=${drift} var=${variance.toFixed(2)}`);
+  console.log(
+    `  ring r: mean=${mean.toFixed(1)} min=${Math.min(...radii)} max=${Math.max(...radii)} drift=${drift} var=${variance.toFixed(2)}`
+  );
   const peaks = results.map((r) => r.maxLum);
   console.log(`  maxLum: min=${Math.min(...peaks)} max=${Math.max(...peaks)}`);
   const sectors = results.map((r) => r.sectorLum);
@@ -179,7 +183,7 @@ if (results.length > 1) {
     const mx = Math.max(...s);
     return s.indexOf(mx);
   });
-  console.log(`  dominant arc sector per frame: ${dominant.map((d) => d * 45).join(', ')}°`);
+  console.log(`  dominant arc sector per frame: ${dominant.map((d) => d * 45).join(", ")}°`);
 }
 
 await browser.close();

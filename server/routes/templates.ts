@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { planConversion, needsServerEngine, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
+import { planConversion, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
 import type { FileCategory } from "../../src/core/conversionRegistry";
 
 export const templatesRouter = Router();
@@ -26,13 +26,12 @@ templatesRouter.post("/", (req, res) => {
   }
 
   const engine = plan.target.engine;
-  const mime = plan.target.mime;
 
   const pythonCode = buildPython(cat, src, tgt, engine);
-  const nodeCode = buildNode(cat, src, tgt, engine, mime);
+  const nodeCode = buildNode(cat, src, tgt, engine);
   const htmlCode = buildHtml(cat, src, tgt, engine);
 
-  res.json({
+  return res.json({
     category: cat,
     sourceFormat: src,
     targetFormat: tgt,
@@ -95,7 +94,7 @@ with open("input.${src}") as f:
 print(json.dumps(data, indent=2))`;
 }
 
-function buildNode(cat: FileCategory, src: string, tgt: string, engine: string, mime: string): string {
+function buildNode(cat: FileCategory, src: string, tgt: string, engine: string): string {
   if (engine === "server") {
     return `// Node.js Code (fluent-ffmpeg)
 import ffmpeg from 'fluent-ffmpeg';
@@ -113,7 +112,7 @@ import sharp from 'sharp';
 
 async function convertImage() {
   await sharp('input.${src}')
-    .${tgt === 'jpg' || tgt === 'jpeg' ? 'jpeg({ quality: 90 })' : tgt === 'webp' ? 'webp({ quality: 85 })' : tgt === 'png' ? 'png({ compressionLevel: 9 })' : tgt + '()'}
+    .${tgt === "jpg" || tgt === "jpeg" ? "jpeg({ quality: 90 })" : tgt === "webp" ? "webp({ quality: 85 })" : tgt === "png" ? "png({ compressionLevel: 9 })" : tgt + "()"}
     .toFile('output.${tgt}');
   console.log('Conversion completed successfully');
 }
@@ -155,7 +154,7 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
     canvas.height = img.height;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
-    const mimeType = 'image/${tgt === 'jpg' ? 'jpeg' : tgt}';
+    const mimeType = 'image/${tgt === "jpg" ? "jpeg" : tgt}';
     const dataUrl = canvas.toDataURL(mimeType, 0.9);
     const link = document.createElement('a');
     link.download = 'converted.${tgt}';

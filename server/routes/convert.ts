@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { createReadStream } from "node:fs";
 import { parseUploadStream, cleanup, UploadError } from "../upload";
-import { convertFile, NoAudioStreamError, UnsupportedFormatError, UnsupportedConversionError, InvalidOptionError } from "../convert";
+import {
+  convertFile,
+  NoAudioStreamError,
+  UnsupportedFormatError,
+  UnsupportedConversionError,
+  InvalidOptionError,
+} from "../convert";
 import { ServerBusyError } from "../ffmpeg/runner";
 import type { ParsedUpload } from "../upload";
 import { planConversion, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
@@ -12,7 +18,7 @@ function logError(context: Record<string, unknown>): void {
   const entry = {
     timestamp: new Date().toISOString(),
     requestId: context.requestId,
-    level: 'error',
+    level: "error",
     ...context,
   };
   // Console output is structured JSON for log aggregation.
@@ -88,7 +94,10 @@ convertRouter.post("/", async (req, res) => {
     if (result.size > 0) {
       res.setHeader("Content-Length", String(result.size));
     }
+    // Force a download and block MIME sniffing so converted SVG/HTML can never
+    // be rendered inline (an XSS vector) and the client always uses our mime.
     res.setHeader("Content-Disposition", `attachment; filename="converted.${upload.targetFormat}"`);
+    res.setHeader("X-Content-Type-Options", "nosniff");
 
     // Stream the on-disk ffmpeg output straight to the client — never buffer it in RAM.
     const stream = createReadStream(result.outPath);
@@ -99,11 +108,12 @@ convertRouter.post("/", async (req, res) => {
       if (!res.headersSent) res.status(500).json({ error: "Failed to stream conversion output" });
       res.end();
     });
+    return;
   } catch (err: unknown) {
     if (controller.signal.aborted) return; // client already gone; nothing to send
     const message = err instanceof Error ? err.message : "Conversion failed";
     const durationMs = Date.now() - startTime;
-    
+
     // Structured error logging with request context.
     logError({
       requestId,
@@ -112,15 +122,21 @@ convertRouter.post("/", async (req, res) => {
       targetFormat: upload?.targetFormat,
       inputSize: upload?.size,
       errorType: err?.constructor?.name,
-      httpStatus: err instanceof UploadError ? err.status :
-                  err instanceof ServerBusyError ? 503 :
-                  err instanceof InvalidOptionError ? 400 :
-                  err instanceof UnsupportedFormatError ||
+      httpStatus:
+        err instanceof UploadError
+          ? err.status
+          : err instanceof ServerBusyError
+            ? 503
+            : err instanceof InvalidOptionError
+              ? 400
+              : err instanceof UnsupportedFormatError ||
                   err instanceof UnsupportedConversionError ||
-                  err instanceof NoAudioStreamError ? 400 : 500,
+                  err instanceof NoAudioStreamError
+                ? 400
+                : 500,
       durationMs,
     });
-    
+
     if (err instanceof UploadError) {
       return res.status(err.status).json({ error: message });
     }
@@ -132,7 +148,7 @@ convertRouter.post("/", async (req, res) => {
       err instanceof UnsupportedConversionError ||
       err instanceof NoAudioStreamError ||
       err instanceof InvalidOptionError;
-    res.status(isClientError ? 400 : 500).json({ error: message });
+    return res.status(isClientError ? 400 : 500).json({ error: message });
   } finally {
     if (upload) cleanup(upload.tempDir, upload.filePath);
   }

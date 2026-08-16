@@ -2,23 +2,50 @@ import { spawn, ChildProcess } from "node:child_process";
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import ffmpegPath from "ffmpeg-static";
+import { createRequire } from "node:module";
+
+// createRequire works under both tsx (ESM) and the esbuild CJS bundle.
+let nodeRequire: NodeRequire;
+try {
+  nodeRequire = createRequire(import.meta.url);
+} catch {
+  nodeRequire = createRequire(join(process.cwd(), "package.json"));
+}
+
+/**
+ * Resolve the ffmpeg binary in priority order:
+ * 1. FFMPEG_PATH env (Docker installs system ffmpeg at /usr/bin/ffmpeg)
+ * 2. bundled ffmpeg-static binary (local dev fallback, devDependency)
+ * 3. "ffmpeg" on PATH (system install)
+ */
+function resolveFfmpegBinary(): string {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    return nodeRequire("ffmpeg-static") as string;
+  } catch {
+    return "ffmpeg";
+  }
+}
+
+export const FFMPEG_BIN: string = resolveFfmpegBinary();
 
 export interface FFmpegResult {
   /** path to the completed output file */
   outPath: string;
   /** size of the output file in bytes */
   size: number;
+  /** the temp dir that holds outPath (exposed so callers can inspect/stream) */
+  tempDir: string;
   /** remove the temp dir holding outPath */
   cleanup: () => void;
 }
 
 export interface FFmpegRunOptions {
-  inputPath?: string;
+  inputPath?: string | undefined;
   /** kill the child process if this signal aborts */
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   /** kill the child process if it runs longer than this (ms) */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
 }
 
 /**
@@ -29,6 +56,9 @@ const MAX_CONCURRENT_FFMPEG = Math.max(1, Number(process.env.FFMPEG_MAX_CONCURRE
 
 /** Max jobs parked in the queue before new conversions are rejected (503). */
 const MAX_QUEUE = Math.max(1, MAX_CONCURRENT_FFMPEG * 5);
+
+/** Default ffmpeg timeout (ms). Override via FFMPEG_TIMEOUT_MS. */
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Thrown when the ffmpeg queue is full; the route maps it to HTTP 503. */
 export class ServerBusyError extends Error {
@@ -114,7 +144,7 @@ export async function runFFmpeg(args: string[], opts: FFmpegRunOptions = {}): Pr
 
 function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegResult> {
   return new Promise((resolve, reject) => {
-    if (!ffmpegPath) return reject(new Error("ffmpeg binary not available"));
+    if (!FFMPEG_BIN) return reject(new Error("ffmpeg binary not available"));
 
     const tempDir = mkdtempSync(join(tmpdir(), "fs-"));
     const outPath = join(tempDir, "output.bin");
@@ -131,8 +161,8 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     };
     opts.signal?.addEventListener("abort", abort, { once: true });
 
-    // Kill the child if it exceeds the timeout. Default: 5 minutes.
-    const timeoutMs = opts.timeoutMs ?? (Number(process.env.FFMPEG_TIMEOUT_MS) || 5 * 60 * 1000);
+    // Kill the child if it exceeds the timeout.
+    const timeoutMs = opts.timeoutMs ?? (Number(process.env.FFMPEG_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
     let timeoutHandle: NodeJS.Timeout | undefined;
     if (timeoutMs > 0) {
       timeoutHandle = setTimeout(() => {
@@ -143,7 +173,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
       }, timeoutMs);
     }
 
-    proc = spawn(ffmpegPath, ["-hide_banner", "-nostdin", ...inputArgs, ...args, outPath]);
+    proc = spawn(FFMPEG_BIN, ["-hide_banner", "-nostdin", ...inputArgs, ...args, outPath]);
     proc.stderr?.on("data", (c: Buffer) => err.push(c));
     proc.on("error", (e) => {
       settled = true;
@@ -168,10 +198,12 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
         } catch {
           // leave 0; route falls back to no Content-Length header
         }
-        resolve({ outPath, size, cleanup: () => cleanupTempDir(outPath) });
+        resolve({ outPath, tempDir, size, cleanup: () => cleanupTempDir(outPath) });
       } else {
         cleanupTempDir(outPath);
-        reject(new Error(`ffmpeg failed (${code}): ${sanitizeFfmpegStderr(Buffer.concat(err).toString("utf8"))}`));
+        reject(
+          new Error(`ffmpeg failed (${code}): ${sanitizeFfmpegStderr(Buffer.concat(err).toString("utf8"))}`)
+        );
       }
     });
   });

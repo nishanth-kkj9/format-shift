@@ -11,7 +11,7 @@ let failures = 0;
 try {
   // --- 1. wav -> wav (browser engine, NO spectrum visualizer) ---
   await page.goto(base, { waitUntil: "networkidle" });
-  await page.setInputFiles('input[type="file"]', "test-2s.wav");
+  await page.setInputFiles('input[type="file"]', "tests/visualizer/test-2s.wav");
   await page.waitForSelector("text=/test-2s\\.wav/", { timeout: 5000 });
 
   // Open options modal and explicitly keep spectrum visualizer OFF (default is off).
@@ -42,7 +42,7 @@ try {
 
   // --- 2. cancel a visualizer conversion ---
   await page.goto(base, { waitUntil: "networkidle" });
-  await page.setInputFiles('input[type="file"]', "test-2s.wav");
+  await page.setInputFiles('input[type="file"]', "tests/visualizer/test-2s.wav");
   await page.waitForSelector("text=/test-2s\\.wav/", { timeout: 5000 });
   await page.locator("select").first().selectOption("mp4");
   await page.waitForTimeout(200);

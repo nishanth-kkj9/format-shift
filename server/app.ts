@@ -1,25 +1,28 @@
+// Load .env before anything reads process.env (runner resolves FFMPEG_PATH at
+// import time, config validates the rest at boot).
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import ffmpegPath from "ffmpeg-static";
-import { convertRouter } from "./server/routes/convert";
-import { templatesRouter } from "./server/routes/templates";
-import { getFFmpegConcurrency } from "./server/ffmpeg/runner";
+import { convertRouter } from "./routes/convert";
+import { templatesRouter } from "./routes/templates";
+import { getFFmpegConcurrency, FFMPEG_BIN } from "./ffmpeg/runner";
+import { env } from "./config";
 
 const app = express();
-const PORT = Number(process.env.PORT || 4000);
 
 // Trust proxy configuration: only trust the first proxy if explicitly enabled via env.
 // This prevents IP spoofing when behind a reverse proxy.
 // Set TRUST_PROXY=1 in production behind a trusted proxy (nginx, Cloudflare, etc.).
-if (process.env.TRUST_PROXY === "1") {
+if (env.TRUST_PROXY) {
   app.set("trust proxy", 1);
 }
 
 // HSTS should only be sent when the site is actually served over HTTPS (usually
 // behind a TLS-terminating proxy). Enable explicitly with ENABLE_HSTS=1.
-if (process.env.ENABLE_HSTS === "1") {
+if (env.ENABLE_HSTS) {
   app.use((_req, res, next) => {
     res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
     next();
@@ -29,23 +32,31 @@ if (process.env.ENABLE_HSTS === "1") {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Security headers middleware (minimal, no external dependency)
-app.use((_req, res, next) => {
-  // Prevent clickjacking
-  res.setHeader("X-Frame-Options", "DENY");
-  // Prevent MIME type sniffing
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  // Enable XSS protection (legacy but harmless)
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  // Referrer policy
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  // Permissions policy (restrict dangerous browser features)
-  res.setHeader(
-    "Permissions-Policy",
-    "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
-  );
-  next();
-});
+// Standard hardening headers via helmet. CSP must allow the dev server's Vite
+// scripts (served same-origin via proxy) and inline styles used by Tailwind.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "blob:", "data:"],
+        mediaSrc: ["'self'", "blob:"],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    // Keep the previous hand-rolled values: DENY (stricter than helmet's
+    // SAMEORIGIN) and the common strict-origin-when-cross-origin referrer policy.
+    frameguard: { action: "deny" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    crossOriginEmbedderPolicy: false,
+    // HSTS is managed by the ENABLE_HSTS-gated middleware above so it is only
+    // ever sent over real HTTPS deployments, never plain HTTP.
+    hsts: false,
+  })
+);
 
 // Rate limit the conversion endpoint to prevent abuse
 const apiLimiter = rateLimit({
@@ -80,13 +91,13 @@ app.use((req, res, next) => {
 });
 
 // API endpoints
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (_req, res) => {
   const concurrency = getFFmpegConcurrency();
   res.json({
     status: "ok",
     app: "FormatShift Universal Converter",
     timestamp: new Date().toISOString(),
-    ffmpeg: ffmpegPath ? "available" : "missing",
+    ffmpeg: FFMPEG_BIN ? "available" : "missing",
     ffmpegConcurrency: {
       max: concurrency.max,
       active: concurrency.active,
@@ -109,18 +120,3 @@ if (fs.existsSync(path.join(distDir, "index.html"))) {
 }
 
 export { app };
-
-const isMain = (() => {
-  try {
-    if (typeof require !== "undefined" && require.main === module) return true;
-  } catch {
-    // ESM/tsx — require unavailable
-  }
-  return process.argv[1] && !!import.meta.url && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
-})();
-
-if (isMain) {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`API server running on http://localhost:${PORT}`);
-  });
-}

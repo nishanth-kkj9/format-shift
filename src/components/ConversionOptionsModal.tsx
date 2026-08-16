@@ -1,6 +1,16 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, RotateCw, FlipHorizontal, FlipVertical, Sliders, Check, ShieldCheck, Share2, Activity } from 'lucide-react';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  X,
+  RotateCw,
+  FlipHorizontal,
+  FlipVertical,
+  Sliders,
+  Check,
+  ShieldCheck,
+  Share2,
+  Activity,
+} from "lucide-react";
 import {
   ConversionItem,
   ImageConversionOptions,
@@ -10,14 +20,14 @@ import {
   SocialMediaPreset,
   SpectrumStyle,
   SpectrumTheme,
-} from '../types';
-import { SOCIAL_PRESETS } from '../utils/converter';
+} from "../types";
+import { SOCIAL_PRESETS } from "../utils/converter";
 
 interface ConversionOptionsModalProps {
   item: ConversionItem;
   isOpen: boolean;
   onClose: () => void;
-  onSaveOptions: (itemId: string, updatedOptions: ConversionItem['options']) => void;
+  onSaveOptions: (itemId: string, updatedOptions: ConversionItem["options"]) => void;
 }
 
 export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
@@ -30,31 +40,31 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
     item.options.image || {
       quality: 85,
       maintainAspectRatio: true,
-      bgColor: '#0f172a',
+      bgColor: "#0f172a",
       grayscale: false,
       rotation: 0,
       flipHorizontal: false,
       flipVertical: false,
-      socialPreset: 'custom',
+      socialPreset: "custom",
       stripExif: true,
     }
   );
 
   const [audioOpts, setAudioOpts] = useState<AudioConversionOptions>(
     item.options.audio || {
-      bitrate: '192k',
+      bitrate: "192k",
       sampleRate: 44100,
       channels: 2,
       volume: 100,
       spectrumVisualizer: false,
-      spectrumStyle: 'bars',
-      spectrumTheme: 'neon-lime',
+      spectrumStyle: "bars",
+      spectrumTheme: "neon-lime",
     }
   );
 
   const [videoOpts, setVideoOpts] = useState<VideoConversionOptions>(
     item.options.video || {
-      resolution: 'original',
+      resolution: "original",
       fps: 30,
       muteAudio: false,
     }
@@ -62,7 +72,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
 
   const [dataOpts, setDataOpts] = useState<DataConversionOptions>(
     item.options.data || {
-      delimiter: ',',
+      delimiter: ",",
       prettyPrint: true,
       indentSpaces: 2,
     }
@@ -70,10 +80,10 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
 
   const handleSave = () => {
     onSaveOptions(item.id, {
-      image: item.category === 'image' ? imageOpts : item.options.image,
-      audio: item.category === 'audio' ? audioOpts : item.options.audio,
-      video: item.category === 'video' ? videoOpts : item.options.video,
-      data: item.category === 'data' || item.category === 'document' ? dataOpts : item.options.data,
+      image: item.category === "image" ? imageOpts : item.options.image,
+      audio: item.category === "audio" ? audioOpts : item.options.audio,
+      video: item.category === "video" ? videoOpts : item.options.video,
+      data: item.category === "data" || item.category === "document" ? dataOpts : item.options.data,
     });
     onClose();
   };
@@ -96,7 +106,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
             initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
             className="relative z-10 w-full max-w-lg bg-slate-900 text-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden glass-card flex flex-col max-h-[85vh]"
           >
             {/* Modal Header */}
@@ -109,9 +119,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   <h3 className="text-sm font-black text-white flex items-center gap-2">
                     <span>Format Fine-Tuning</span>
                   </h3>
-                  <p className="text-xs text-indigo-300 font-medium truncate max-w-[240px]">
-                    {item.name}
-                  </p>
+                  <p className="text-xs text-indigo-300 font-medium truncate max-w-[240px]">{item.name}</p>
                 </div>
               </div>
               <button
@@ -124,9 +132,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
 
             {/* Modal Body */}
             <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
-              
               {/* IMAGE OPTIONS */}
-              {item.category === 'image' && (
+              {item.category === "image" && (
                 <div className="space-y-5">
                   {/* Social Media Resizer Presets */}
                   <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 space-y-2">
@@ -135,10 +142,10 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                       Social Media Resizer Presets
                     </label>
                     <select
-                      value={imageOpts.socialPreset || 'custom'}
+                      value={imageOpts.socialPreset || "custom"}
                       onChange={(e) => {
                         const preset = e.target.value as SocialMediaPreset;
-                        if (preset !== 'custom' && SOCIAL_PRESETS[preset]) {
+                        if (preset !== "custom" && SOCIAL_PRESETS[preset]) {
                           const dim = SOCIAL_PRESETS[preset];
                           setImageOpts({
                             ...imageOpts,
@@ -147,7 +154,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             maxHeight: dim.h,
                           });
                         } else {
-                          setImageOpts({ ...imageOpts, socialPreset: 'custom' });
+                          setImageOpts({ ...imageOpts, socialPreset: "custom" });
                         }
                       }}
                       className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-slate-950 border border-indigo-500/40 text-white cursor-pointer focus:ring-2 focus:ring-indigo-500"
@@ -166,9 +173,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   {/* Quality Slider */}
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-slate-200">
-                        Image Quality / Compression
-                      </label>
+                      <label className="text-xs font-bold text-slate-200">Image Quality / Compression</label>
                       <span className="text-xs font-extrabold text-indigo-400 font-mono px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-400/30">
                         {imageOpts.quality}%
                       </span>
@@ -199,7 +204,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         </span>
                       </label>
                       <p className="text-[11px] text-slate-300/80 leading-relaxed">
-                        Strips camera serial numbers, GPS location coordinates, exposure data, and capture timestamp metadata during conversion.
+                        Strips camera serial numbers, GPS location coordinates, exposure data, and capture
+                        timestamp metadata during conversion.
                       </p>
                     </div>
                   </div>
@@ -212,15 +218,13 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                     <div className="flex items-center gap-3">
                       <input
                         type="color"
-                        value={imageOpts.bgColor || '#0f172a'}
+                        value={imageOpts.bgColor || "#0f172a"}
                         onChange={(e) => setImageOpts({ ...imageOpts, bgColor: e.target.value })}
                         className="w-9 h-9 rounded-xl border border-white/20 bg-transparent cursor-pointer p-0.5"
                       />
-                      <span className="text-xs font-mono font-bold text-slate-300">
-                        {imageOpts.bgColor}
-                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-300">{imageOpts.bgColor}</span>
                       <div className="flex gap-1.5 ml-auto">
-                        {['#0f172a', '#ffffff', '#000000', '#4f46e5'].map((hex) => (
+                        {["#0f172a", "#ffffff", "#000000", "#4f46e5"].map((hex) => (
                           <button
                             key={hex}
                             type="button"
@@ -240,15 +244,17 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <span className="text-[11px] text-slate-400 block mb-1 font-semibold">Max Width (px)</span>
+                        <span className="text-[11px] text-slate-400 block mb-1 font-semibold">
+                          Max Width (px)
+                        </span>
                         <input
                           type="number"
                           placeholder="e.g. 1920"
-                          value={imageOpts.maxWidth || ''}
+                          value={imageOpts.maxWidth || ""}
                           onChange={(e) =>
                             setImageOpts({
                               ...imageOpts,
-                              socialPreset: 'custom',
+                              socialPreset: "custom",
                               maxWidth: e.target.value ? parseInt(e.target.value) : undefined,
                             })
                           }
@@ -256,15 +262,17 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         />
                       </div>
                       <div>
-                        <span className="text-[11px] text-slate-400 block mb-1 font-semibold">Max Height (px)</span>
+                        <span className="text-[11px] text-slate-400 block mb-1 font-semibold">
+                          Max Height (px)
+                        </span>
                         <input
                           type="number"
                           placeholder="e.g. 1080"
-                          value={imageOpts.maxHeight || ''}
+                          value={imageOpts.maxHeight || ""}
                           onChange={(e) =>
                             setImageOpts({
                               ...imageOpts,
-                              socialPreset: 'custom',
+                              socialPreset: "custom",
                               maxHeight: e.target.value ? parseInt(e.target.value) : undefined,
                             })
                           }
@@ -276,9 +284,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
 
                   {/* Transform / Rotate / Flip Tools */}
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-                    <label className="text-xs font-bold text-slate-200 block">
-                      Image Transformations
-                    </label>
+                    <label className="text-xs font-bold text-slate-200 block">Image Transformations</label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -290,7 +296,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         }
                         className="px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 text-xs font-bold text-slate-200 hover:bg-white/15 flex items-center gap-1.5 cursor-pointer"
                       >
-                        <RotateCw className="w-3.5 h-3.5 text-indigo-400" /> Rotate 90° ({imageOpts.rotation || 0}°)
+                        <RotateCw className="w-3.5 h-3.5 text-indigo-400" /> Rotate 90° (
+                        {imageOpts.rotation || 0}°)
                       </button>
                       <button
                         type="button"
@@ -302,8 +309,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         }
                         className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
                           imageOpts.flipHorizontal
-                            ? 'bg-indigo-600 text-white border-indigo-400'
-                            : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/15'
+                            ? "bg-indigo-600 text-white border-indigo-400"
+                            : "border-white/15 bg-white/5 text-slate-200 hover:bg-white/15"
                         }`}
                       >
                         <FlipHorizontal className="w-3.5 h-3.5" /> Flip Horizontal
@@ -318,8 +325,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         }
                         className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
                           imageOpts.flipVertical
-                            ? 'bg-indigo-600 text-white border-indigo-400'
-                            : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/15'
+                            ? "bg-indigo-600 text-white border-indigo-400"
+                            : "border-white/15 bg-white/5 text-slate-200 hover:bg-white/15"
                         }`}
                       >
                         <FlipVertical className="w-3.5 h-3.5" /> Flip Vertical
@@ -343,7 +350,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
               )}
 
               {/* AUDIO OPTIONS */}
-              {item.category === 'audio' && (
+              {item.category === "audio" && (
                 <div className="space-y-5">
                   {/* Audio Spectrum Visualizer Section */}
                   <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 space-y-3">
@@ -357,8 +364,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                           type="checkbox"
                           checked={
                             audioOpts.spectrumVisualizer ||
-                            item.targetFormat === 'mp4' ||
-                            item.targetFormat === 'webm'
+                            item.targetFormat === "mp4" ||
+                            item.targetFormat === "webm"
                           }
                           onChange={(e) =>
                             setAudioOpts({ ...audioOpts, spectrumVisualizer: e.target.checked })
@@ -370,19 +377,20 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                     </div>
 
                     <p className="text-[11px] text-slate-300/80 leading-relaxed">
-                      Converts audio into an animated HD video soundwave (`MP4` / `WEBM`) ready for social media!
+                      Converts audio into an animated HD video soundwave (`MP4` / `WEBM`) ready for social
+                      media!
                     </p>
 
                     {(audioOpts.spectrumVisualizer ||
-                      item.targetFormat === 'mp4' ||
-                      item.targetFormat === 'webm') && (
+                      item.targetFormat === "mp4" ||
+                      item.targetFormat === "webm") && (
                       <div className="pt-2 grid grid-cols-2 gap-3 border-t border-indigo-500/20">
                         <div>
                           <label className="text-[11px] font-semibold text-slate-300 block mb-1">
                             Visualizer Style
                           </label>
                           <select
-                            value={audioOpts.spectrumStyle || 'bars'}
+                            value={audioOpts.spectrumStyle || "bars"}
                             onChange={(e) =>
                               setAudioOpts({
                                 ...audioOpts,
@@ -403,7 +411,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             Color Theme
                           </label>
                           <select
-                            value={audioOpts.spectrumTheme || 'neon-lime'}
+                            value={audioOpts.spectrumTheme || "neon-lime"}
                             onChange={(e) =>
                               setAudioOpts({
                                 ...audioOpts,
@@ -425,19 +433,17 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">
-                      Target Audio Bitrate
-                    </label>
+                    <label className="text-xs font-bold text-slate-200 block">Target Audio Bitrate</label>
                     <div className="grid grid-cols-4 gap-2">
-                      {['128k', '192k', '256k', '320k'].map((b) => (
+                      {["128k", "192k", "256k", "320k"].map((b) => (
                         <button
                           key={b}
                           type="button"
                           onClick={() => setAudioOpts({ ...audioOpts, bitrate: b as any })}
                           className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             audioOpts.bitrate === b
-                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                              : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
+                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
                           }`}
                         >
                           {b}
@@ -445,12 +451,11 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                       ))}
                     </div>
                     {(audioOpts.spectrumVisualizer ||
-                      item.targetFormat === 'mp4' ||
-                      item.targetFormat === 'webm') && (
+                      item.targetFormat === "mp4" ||
+                      item.targetFormat === "webm") && (
                       <p className="text-[11px] text-slate-300/80 leading-relaxed">
-                        Spectrum video output encodes audio with the browser's native
-                        codec (bitrate/sample rate are set by the browser, not this
-                        control).
+                        Spectrum video output encodes audio with the browser's native codec (bitrate/sample
+                        rate are set by the browser, not this control).
                       </p>
                     )}
                   </div>
@@ -476,18 +481,16 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
               )}
 
               {/* VIDEO OPTIONS */}
-              {item.category === 'video' && (
+              {item.category === "video" && (
                 <div className="space-y-5">
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">
-                      Target Resolution
-                    </label>
+                    <label className="text-xs font-bold text-slate-200 block">Target Resolution</label>
                     <div className="grid grid-cols-2 gap-2">
                       {[
-                        { label: 'Original', val: 'original' },
-                        { label: '1080p Full HD', val: '1080p' },
-                        { label: '720p HD', val: '720p' },
-                        { label: '480p SD', val: '480p' },
+                        { label: "Original", val: "original" },
+                        { label: "1080p Full HD", val: "1080p" },
+                        { label: "720p HD", val: "720p" },
+                        { label: "480p SD", val: "480p" },
                       ].map((r) => (
                         <button
                           key={r.val}
@@ -495,8 +498,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                           onClick={() => setVideoOpts({ ...videoOpts, resolution: r.val as any })}
                           className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             videoOpts.resolution === r.val
-                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                              : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
+                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
                           }`}
                         >
                           {r.label}
@@ -506,9 +509,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">
-                      Target Frame Rate (FPS)
-                    </label>
+                    <label className="text-xs font-bold text-slate-200 block">Target Frame Rate (FPS)</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[24, 30, 60].map((fps) => (
                         <button
@@ -517,8 +518,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                           onClick={() => setVideoOpts({ ...videoOpts, fps: fps as any })}
                           className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             videoOpts.fps === fps
-                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                              : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
+                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
                           }`}
                         >
                           {fps} FPS
@@ -542,26 +543,24 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
               )}
 
               {/* DATA & DOCUMENT OPTIONS */}
-              {(item.category === 'data' || item.category === 'document') && (
+              {(item.category === "data" || item.category === "document") && (
                 <div className="space-y-5">
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">
-                      CSV Delimiter Separator
-                    </label>
+                    <label className="text-xs font-bold text-slate-200 block">CSV Delimiter Separator</label>
                     <div className="flex gap-2">
                       {[
-                        { label: 'Comma (,)', val: ',' },
-                        { label: 'Semicolon (;)', val: ';' },
-                        { label: 'Tab (\\t)', val: '\t' },
+                        { label: "Comma (,)", val: "," },
+                        { label: "Semicolon (;)", val: ";" },
+                        { label: "Tab (\\t)", val: "\t" },
                       ].map((d) => (
                         <button
                           key={d.val}
                           type="button"
-                          onClick={() => setDataOpts({ ...dataOpts, delimiter: d.val as ',' | ';' | '\t' })}
+                          onClick={() => setDataOpts({ ...dataOpts, delimiter: d.val as "," | ";" | "\t" })}
                           className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             dataOpts.delimiter === d.val
-                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                              : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
+                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
                           }`}
                         >
                           {d.label}
@@ -571,9 +570,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">
-                      JSON / Code Indentation
-                    </label>
+                    <label className="text-xs font-bold text-slate-200 block">JSON / Code Indentation</label>
                     <div className="flex gap-2">
                       {[2, 4].map((spaces) => (
                         <button
@@ -582,8 +579,8 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                           onClick={() => setDataOpts({ ...dataOpts, indentSpaces: spaces as 2 | 4 })}
                           className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             dataOpts.indentSpaces === spaces
-                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                              : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
+                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
                           }`}
                         >
                           {spaces} Spaces Indent
@@ -593,7 +590,6 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   </div>
                 </div>
               )}
-
             </div>
 
             {/* Modal Footer */}
@@ -613,7 +609,6 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                 <Check className="w-4 h-4" /> Save Settings
               </button>
             </div>
-
           </motion.div>
         </div>
       )}

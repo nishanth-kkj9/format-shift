@@ -1,13 +1,13 @@
-import { TargetFormat, AudioConversionOptions } from '../types';
-import { convertAudioToSpectrumVideo } from './audioVisualizer';
-import { planConversion } from '../core/conversionRegistry';
+import { TargetFormat, AudioConversionOptions } from "../types";
+import { convertAudioToSpectrumVideo } from "./audioVisualizer";
+import { planConversion } from "../core/conversionRegistry";
 
 // Browser can only produce WAV (or spectrum visualizer video). Any other audio
 // target (mp3, ogg, aac, m4a, flac) requires the FFmpeg server — throw instead
 // of silently mislabeling a WAV blob as the requested format.
 function assertBrowserSupported(targetFormat: TargetFormat): void {
-  const plan = planConversion('audio', targetFormat);
-  if (plan.supported === false || plan.target.engine !== 'browser') {
+  const plan = planConversion("audio", targetFormat);
+  if (plan.supported === false || plan.target.engine !== "browser") {
     throw new Error(`Audio -> ${targetFormat} must run on the FFmpeg server`);
   }
 }
@@ -42,13 +42,13 @@ export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   const view = new DataView(arrayBuffer);
 
   /* RIFF identifier */
-  writeString(view, 0, 'RIFF');
+  writeString(view, 0, "RIFF");
   /* RIFF chunk length */
   view.setUint32(4, 36 + dataByteLength, true);
   /* RIFF type */
-  writeString(view, 8, 'WAVE');
+  writeString(view, 8, "WAVE");
   /* format chunk identifier */
-  writeString(view, 12, 'fmt ');
+  writeString(view, 12, "fmt ");
   /* format chunk length */
   view.setUint32(16, 16, true);
   /* sample format (raw) */
@@ -64,7 +64,7 @@ export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   /* bits per sample */
   view.setUint16(34, bitDepth, true);
   /* data chunk identifier */
-  writeString(view, 36, 'data');
+  writeString(view, 36, "data");
   /* data chunk length */
   view.setUint32(40, dataByteLength, true);
 
@@ -76,7 +76,7 @@ export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
     offset += 2;
   }
 
-  return new Blob([arrayBuffer], { type: 'audio/wav' });
+  return new Blob([arrayBuffer], { type: "audio/wav" });
 }
 
 function writeString(view: DataView, offset: number, string: string) {
@@ -96,14 +96,14 @@ export async function convertAudio(
   assertBrowserSupported(targetFormat);
 
   // If target format is a video format (MP4, WEBM) or user explicitly enabled spectrum visualizer
-  if (targetFormat === 'mp4' || targetFormat === 'webm' || options.spectrumVisualizer) {
-        const result = await convertAudioToSpectrumVideo(file, targetFormat, options, onProgress, abortSignal);
-        return { blob: result.blob, duration: result.duration };
-      }
+  if (targetFormat === "mp4" || targetFormat === "webm" || options.spectrumVisualizer) {
+    const result = await convertAudioToSpectrumVideo(file, targetFormat, options, onProgress, abortSignal);
+    return { blob: result.blob, duration: result.duration };
+  }
 
   // Check for abort before starting
   if (abortSignal?.aborted) {
-    throw new DOMException('Aborted', 'AbortError');
+    throw new DOMException("Aborted", "AbortError");
   }
 
   onProgress?.(15);
@@ -112,23 +112,25 @@ export async function convertAudio(
 
   // Check for abort after reading file
   if (abortSignal?.aborted) {
-    throw new DOMException('Aborted', 'AbortError');
+    throw new DOMException("Aborted", "AbortError");
   }
 
-  const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const AudioCtxClass =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioCtx = new AudioCtxClass();
 
   let decodedBuffer: AudioBuffer;
   try {
     decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
   } catch {
-    throw new Error('Could not decode audio data from file');
+    throw new Error("Could not decode audio data from file");
   }
 
   // Check for abort after decoding
   if (abortSignal?.aborted) {
     audioCtx.close();
-    throw new DOMException('Aborted', 'AbortError');
+    throw new DOMException("Aborted", "AbortError");
   }
 
   onProgress?.(60);
@@ -166,7 +168,7 @@ export async function convertAudio(
   // Check for abort after rendering
   if (abortSignal?.aborted) {
     audioCtx.close();
-    throw new DOMException('Aborted', 'AbortError');
+    throw new DOMException("Aborted", "AbortError");
   }
 
   // Export to WAV PCM

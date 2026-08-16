@@ -1,8 +1,8 @@
-import React from 'react';
-import { Play, Download, Trash2, CheckCircle2, Loader2, FolderArchive, Sparkles } from 'lucide-react';
-import { ConversionItem, TargetFormat, FileCategory } from '../types';
-import { formatBytes } from '../utils/converter';
-import { getAvailableTargets } from '../core/conversionRegistry';
+import React from "react";
+import { Play, Loader2, FolderArchive } from "lucide-react";
+import { ConversionItem, TargetFormat, FileCategory } from "../types";
+import { formatBytes } from "../utils/converter";
+import { getAvailableTargets } from "../core/conversionRegistry";
 
 interface BatchBarProps {
   items: ConversionItem[];
@@ -23,7 +23,7 @@ export const BatchBar: React.FC<BatchBarProps> = ({
 }) => {
   if (items.length === 0) return null;
 
-  const completedCount = items.filter((i) => i.status === 'completed').length;
+  const completedCount = items.filter((i) => i.status === "completed").length;
   const totalCount = items.length;
   const isAllCompleted = completedCount === totalCount && totalCount > 0;
 
@@ -34,12 +34,13 @@ export const BatchBar: React.FC<BatchBarProps> = ({
   return (
     <div className="sticky bottom-6 z-20 w-full max-w-4xl mx-auto px-4">
       <div className="rounded-2xl p-4 glass-card border-white/20 shadow-[0_25px_60px_rgba(0,0,0,0.8)] text-white flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-2xl">
-        
         {/* Left: Global Stats & Batch Quick Selector */}
         <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
           <div>
             <div className="text-xs text-slate-300 font-bold flex items-center gap-1.5">
-              <span>{completedCount} of {totalCount} Converted</span>
+              <span>
+                {completedCount} of {totalCount} Converted
+              </span>
               {totalSavedBytes > 0 && (
                 <span className="text-emerald-400 font-mono font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/30 text-[11px]">
                   Saved {formatBytes(totalSavedBytes)}
@@ -57,14 +58,18 @@ export const BatchBar: React.FC<BatchBarProps> = ({
             defaultValue=""
             className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-900/90 text-indigo-300 border border-indigo-500/40 focus:ring-2 focus:ring-indigo-500 cursor-pointer uppercase shadow-inner"
           >
-            <option value="" disabled>Set All Formats...</option>
-            {(['image', 'audio', 'video', 'data', 'document'] as FileCategory[]).map((cat) => {
+            <option value="" disabled>
+              Set All Formats...
+            </option>
+            {(["image", "audio", "video", "data", "document"] as FileCategory[]).map((cat) => {
               const targets = getAvailableTargets(cat);
               if (targets.length === 0) return null;
               return (
                 <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
                   {targets.map((fmt) => (
-                    <option key={fmt} value={fmt}>All to .{fmt.toUpperCase()}</option>
+                    <option key={fmt} value={fmt}>
+                      All to .{fmt.toUpperCase()}
+                    </option>
                   ))}
                 </optgroup>
               );
@@ -74,7 +79,6 @@ export const BatchBar: React.FC<BatchBarProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          
           {/* Clear Queue Button */}
           <button
             onClick={onClearAll}
@@ -111,9 +115,7 @@ export const BatchBar: React.FC<BatchBarProps> = ({
               )}
             </button>
           )}
-
         </div>
-
       </div>
     </div>
   );

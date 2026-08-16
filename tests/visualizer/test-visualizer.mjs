@@ -15,7 +15,7 @@ try {
   await page.goto(base, { waitUntil: "networkidle" });
 
   // Upload the WAV fixture through the file input.
-  await page.setInputFiles('input[type="file"]', "test-2s.wav");
+  await page.setInputFiles('input[type="file"]', "tests/visualizer/test-2s.wav");
   await page.waitForSelector("text=/test-2s\\.wav/", { timeout: 5000 });
 
   // The file list shows a FormatDropdown; choose mp4.

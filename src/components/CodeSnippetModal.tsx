@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Code2, Copy, Check } from 'lucide-react';
-import { CodeTemplateResponse, FileCategory } from '../types';
-import { CONVERSION_REGISTRY, getAvailableTargets } from '../core/conversionRegistry';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { X, Code2, Copy, Check } from "lucide-react";
+import { CodeTemplateResponse, FileCategory } from "../types";
+import { CONVERSION_REGISTRY, getAvailableTargets } from "../core/conversionRegistry";
 
 interface CodeSnippetModalProps {
   isOpen: boolean;
@@ -15,26 +15,26 @@ interface CodeSnippetModalProps {
 export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   isOpen,
   onClose,
-  category = 'image',
-  sourceFormat = 'png',
-  targetFormat = 'jpg',
+  category = "image",
+  sourceFormat = "png",
+  targetFormat = "jpg",
 }) => {
-  const [activeTab, setActiveTab] = useState<'python' | 'node' | 'html'>('python');
+  const [activeTab, setActiveTab] = useState<"python" | "node" | "html">("python");
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [codeData, setCodeData] = useState<CodeTemplateResponse['code'] | null>(null);
+  const [codeData, setCodeData] = useState<CodeTemplateResponse["code"] | null>(null);
 
   // Local state for user-selectable conversion parameters
-  const [selCategory, setSelCategory] = useState<FileCategory>(category as FileCategory || 'image');
-  const [selSource, setSelSource] = useState(sourceFormat || 'png');
-  const [selTarget, setSelTarget] = useState(targetFormat || 'jpg');
+  const [selCategory, setSelCategory] = useState<FileCategory>((category as FileCategory) || "image");
+  const [selSource, setSelSource] = useState(sourceFormat || "png");
+  const [selTarget, setSelTarget] = useState(targetFormat || "jpg");
 
   // When the modal opens, sync local state with the props (which come from queue[0]).
   useEffect(() => {
     if (isOpen) {
-      setSelCategory((category as FileCategory) || 'image');
-      setSelSource(sourceFormat || 'png');
-      setSelTarget(targetFormat || 'jpg');
+      setSelCategory((category as FileCategory) || "image");
+      setSelSource(sourceFormat || "png");
+      setSelTarget(targetFormat || "jpg");
     }
   }, [isOpen, category, sourceFormat, targetFormat]);
 
@@ -47,9 +47,9 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
     if (!isOpen) return;
     setLoading(true);
 
-    fetch('/api/code-template', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    fetch("/api/code-template", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: selCategory, sourceFormat: selSource, targetFormat: selTarget }),
     })
       .then((res) => res.json())
@@ -68,7 +68,7 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
       });
   }, [isOpen, selCategory, selSource, selTarget]);
 
-  const currentCode = codeData ? codeData[activeTab] : '';
+  const currentCode = codeData ? codeData[activeTab] : "";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(currentCode);
@@ -94,7 +94,7 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
             className="relative z-10 w-full max-w-3xl bg-slate-900 text-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden glass-card flex flex-col max-h-[85vh]"
           >
             {/* Header */}
@@ -104,11 +104,11 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                   <Code2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">
-                    Developer API & Code Snippets
-                  </h3>
+                  <h3 className="text-sm font-black text-white">Developer API & Code Snippets</h3>
                   <p className="text-xs text-slate-400">
-                    Programmatic <span className="font-bold text-indigo-400 uppercase">{sourceFormat}</span> → <span className="font-bold text-indigo-400 uppercase">{targetFormat}</span> conversion code templates
+                    Programmatic <span className="font-bold text-indigo-400 uppercase">{sourceFormat}</span> →{" "}
+                    <span className="font-bold text-indigo-400 uppercase">{targetFormat}</span> conversion
+                    code templates
                   </p>
                 </div>
               </div>
@@ -123,7 +123,9 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             {/* Conversion Parameter Selectors */}
             <div className="px-6 py-3 border-b border-white/10 bg-slate-950/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Category</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Category
+                </label>
                 <select
                   value={selCategory}
                   onChange={(e) => {
@@ -132,37 +134,47 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                     // Reset source/target to sensible defaults for the new category
                     const srcs = CONVERSION_REGISTRY[cat]?.sourceFormats || [];
                     const tgts = getAvailableTargets(cat) || [];
-                    setSelSource(srcs[0] || 'png');
-                    setSelTarget(tgts[0] || 'jpg');
+                    setSelSource(srcs[0] || "png");
+                    setSelTarget(tgts[0] || "jpg");
                   }}
                   className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
                 >
-                  {(['image', 'audio', 'video', 'data', 'document'] as FileCategory[]).map((c) => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  {(["image", "audio", "video", "data", "document"] as FileCategory[]).map((c) => (
+                    <option key={c} value={c}>
+                      {c.charAt(0).toUpperCase() + c.slice(1)}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source Format</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Source Format
+                </label>
                 <select
                   value={selSource}
                   onChange={(e) => setSelSource(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
                 >
                   {sourceOptions.map((f) => (
-                    <option key={f} value={f}>{f.toUpperCase()}</option>
+                    <option key={f} value={f}>
+                      {f.toUpperCase()}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Target Format</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Target Format
+                </label>
                 <select
                   value={selTarget}
                   onChange={(e) => setSelTarget(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
                 >
                   {targetOptions.map((f) => (
-                    <option key={f} value={f}>{f.toUpperCase()}</option>
+                    <option key={f} value={f}>
+                      {f.toUpperCase()}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -172,31 +184,31 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             <div className="flex items-center justify-between px-6 py-2.5 border-b border-white/10 bg-slate-950/60">
               <div className="flex gap-2">
                 <button
-                  onClick={() => setActiveTab('python')}
+                  onClick={() => setActiveTab("python")}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'python'
-                      ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)]'
-                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                    activeTab === "python"
+                      ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)]"
+                      : "text-slate-400 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   🐍 Python
                 </button>
                 <button
-                  onClick={() => setActiveTab('node')}
+                  onClick={() => setActiveTab("node")}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'node'
-                      ? 'bg-emerald-600 text-white shadow-[0_0_12px_rgba(5,150,105,0.4)]'
-                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                    activeTab === "node"
+                      ? "bg-emerald-600 text-white shadow-[0_0_12px_rgba(5,150,105,0.4)]"
+                      : "text-slate-400 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   🟢 Node.js
                 </button>
                 <button
-                  onClick={() => setActiveTab('html')}
+                  onClick={() => setActiveTab("html")}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === 'html'
-                      ? 'bg-orange-600 text-white shadow-[0_0_12px_rgba(234,88,12,0.4)]'
-                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                    activeTab === "html"
+                      ? "bg-orange-600 text-white shadow-[0_0_12px_rgba(234,88,12,0.4)]"
+                      : "text-slate-400 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   🌐 HTML5 / JS
@@ -224,7 +236,9 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             {/* Code Output Terminal Block */}
             <div className="p-6 overflow-y-auto flex-1 bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed border-b border-white/10">
               {loading ? (
-                <div className="text-slate-500 py-12 text-center animate-pulse">Generating runnable code snippet...</div>
+                <div className="text-slate-500 py-12 text-center animate-pulse">
+                  Generating runnable code snippet...
+                </div>
               ) : (
                 <pre className="whitespace-pre-wrap">{currentCode}</pre>
               )}
@@ -233,14 +247,10 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             {/* Footer */}
             <div className="px-6 py-3 bg-slate-900/80 text-[11px] text-slate-400 flex justify-between items-center">
               <span>FormatShift Developer Suite</span>
-              <button
-                onClick={onClose}
-                className="font-bold text-indigo-400 hover:underline cursor-pointer"
-              >
+              <button onClick={onClose} className="font-bold text-indigo-400 hover:underline cursor-pointer">
                 Close
               </button>
             </div>
-
           </motion.div>
         </div>
       )}
