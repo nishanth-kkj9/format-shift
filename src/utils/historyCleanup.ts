@@ -11,7 +11,7 @@ export function revokeHistoryUrls(
   revoke: (url: string) => void = (url) => URL.revokeObjectURL(url)
 ): void {
   for (const entry of history) {
-    if (!retainedUrls.has(entry.downloadUrl)) {
+    if (entry.downloadUrl && !retainedUrls.has(entry.downloadUrl)) {
       revoke(entry.downloadUrl);
     }
   }
@@ -31,4 +31,23 @@ export function clearHistoryRevoking(
 ): ConversionHistoryItem[] {
   revokeHistoryUrls(history, queueUrls, revoke);
   return [];
+}
+
+/**
+ * History persistence must never carry blob URLs: they are session-scoped and
+ * die on reload, so a persisted entry would advertise a download that cannot
+ * work. Strip the volatile field before writing to storage.
+ */
+export function historyForStorage(history: ConversionHistoryItem[]): ConversionHistoryItem[] {
+  return history.map(({ downloadUrl, ...rest }) => rest);
+}
+
+/** Read persisted history, dropping any stale blob URLs from older versions. */
+export function hydrateHistory(raw: string | null): ConversionHistoryItem[] {
+  if (!raw) return [];
+  try {
+    return (JSON.parse(raw) as ConversionHistoryItem[]).map(({ downloadUrl, ...rest }) => rest);
+  } catch {
+    return [];
+  }
 }

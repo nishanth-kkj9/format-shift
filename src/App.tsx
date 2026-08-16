@@ -10,14 +10,13 @@ import {
   convertDataDocument,
 } from "./utils/converter";
 import { extractFileMetadata } from "./utils/metadata";
-import { clearHistoryRevoking } from "./utils/historyCleanup";
+import { clearHistoryRevoking, historyForStorage, hydrateHistory } from "./utils/historyCleanup";
 import { convertServerSide, needsServerConversion } from "./utils/serverConvert";
 
 import { Header } from "./components/Header";
 import { Dropzone } from "./components/Dropzone";
 import { FileList } from "./components/FileList";
 import { BatchBar } from "./components/BatchBar";
-import { FORMAT_OPTIONS } from "./components/FormatDropdown";
 import { Sparkles, Zap, ShieldCheck, HeartHandshake } from "lucide-react";
 
 // Heavy modal components load on demand — keeps the initial bundle small.
@@ -42,11 +41,11 @@ export default function App() {
   // File Queue
   const [queue, setQueue] = useState<ConversionItem[]>([]);
 
-  // History
+  // History (persisted metadata only: blob URLs are session-scoped and are
+  // stripped on write / on load, so restored entries never carry dead links).
   const [history, setHistory] = useState<ConversionHistoryItem[]>(() => {
     try {
-      const saved = localStorage.getItem("formatshift_history");
-      return saved ? JSON.parse(saved) : [];
+      return hydrateHistory(localStorage.getItem("formatshift_history"));
     } catch {
       return [];
     }
@@ -77,10 +76,10 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Sync history to localStorage
+  // Sync history to localStorage (metadata only; never blob URLs)
   useEffect(() => {
     try {
-      localStorage.setItem("formatshift_history", JSON.stringify(history));
+      localStorage.setItem("formatshift_history", JSON.stringify(historyForStorage(history)));
     } catch {
       // ignore quota error
     }
@@ -105,6 +104,7 @@ export default function App() {
         originalExtension: detected?.sourceFormat || (file.name.split(".").pop() || "").toLowerCase(),
         category: detected?.category || "document",
         targetFormat: detected?.defaultTargetFormat || "txt",
+        availableTargets: detected?.availableTargets ?? [],
         status: detectError ? "error" : "idle",
         progress: 0,
         errorMessage: detectError || undefined,
@@ -137,11 +137,18 @@ export default function App() {
         },
       };
 
-      // Asynchronously extract metadata (preview image, duration, dimensions)
+      // Asynchronously extract metadata (preview image, duration, dimensions).
+      // If the item was removed while extraction was in flight, the queue
+      // update is a no-op and the preview blob URL must be revoked, or it
+      // leaks for the session.
       if (!detectError) {
         extractFileMetadata(file).then((meta) => {
-          setQueue((prev) =>
-            prev.map((item) =>
+          setQueue((prev) => {
+            if (!prev.some((item) => item.id === newItem.id)) {
+              if (meta.previewUrl) URL.revokeObjectURL(meta.previewUrl);
+              return prev;
+            }
+            return prev.map((item) =>
               item.id === newItem.id
                 ? {
                     ...item,
@@ -151,8 +158,8 @@ export default function App() {
                     lineCount: meta.lineCount,
                   }
                 : item
-            )
-          );
+            );
+          });
         });
       }
 
@@ -167,14 +174,11 @@ export default function App() {
     setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, targetFormat: newTarget } : item)));
   };
 
-  // Global Target Format apply
+  // Global Target Format apply (source-aware: never force a target a source
+  // cannot actually be converted to, e.g. HTML -> Markdown).
   const handleApplyGlobalFormat = (format: TargetFormat) => {
     setQueue((prev) =>
-      prev.map((item) =>
-        FORMAT_OPTIONS[item.category].some((o) => o.format === format)
-          ? { ...item, targetFormat: format }
-          : item
-      )
+      prev.map((item) => (item.availableTargets.includes(format) ? { ...item, targetFormat: format } : item))
     );
   };
 
@@ -420,6 +424,9 @@ export default function App() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    // The ZIP URL is only referenced by the transient <a> element; revoke it
+    // right after the click so it does not leak for the session.
+    URL.revokeObjectURL(zipUrl);
   };
 
   // Remove single item from queue

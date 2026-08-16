@@ -47,6 +47,24 @@ describe("detectCategoryAndFormats", () => {
   it("throws for PDF files (no PDF parser is integrated)", () => {
     expect(() => detectCategoryAndFormats(fakeFile("doc.pdf", "application/pdf"))).toThrow(/PDF/);
   });
+
+  it("throws for XML/YAML sources (no parser is integrated)", () => {
+    expect(() => detectCategoryAndFormats(fakeFile("data.xml", "application/xml"))).toThrow(/XML\/YAML/);
+    expect(() => detectCategoryAndFormats(fakeFile("config.yaml", "application/yaml"))).toThrow(/XML\/YAML/);
+    expect(() => detectCategoryAndFormats(fakeFile("config.yml", "application/x-yaml"))).toThrow(/XML\/YAML/);
+  });
+
+  it("HTML sources cannot select Markdown as a target", () => {
+    const r = detectCategoryAndFormats(fakeFile("page.html", "text/html"));
+    expect(r.category).toBe("document");
+    expect(r.availableTargets).not.toContain("md");
+    expect(r.defaultTargetFormat).toBe("txt");
+  });
+
+  it("plain text sources keep Markdown as an honest target", () => {
+    const r = detectCategoryAndFormats(fakeFile("notes.txt", "text/plain"));
+    expect(r.availableTargets).toContain("md");
+  });
 });
 
 describe("SOCIAL_PRESETS", () => {

@@ -10,7 +10,7 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
       // Noisy rules inherited from recommended that fire on pre-existing code.
       // Kept off until the codebase is migrated deliberately rather than via
       // blind --fix (the visualizer engine is intentionally hand-tuned).

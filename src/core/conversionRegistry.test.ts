@@ -3,6 +3,7 @@ import {
   CONVERSION_REGISTRY,
   planConversion,
   getAvailableTargets,
+  getAvailableTargetsForSource,
   getMimeForTarget,
   needsServerEngine,
 } from "./conversionRegistry";
@@ -107,5 +108,30 @@ describe("conversion registry consistency", () => {
 
   it("PDF is not advertised as a document source", () => {
     expect(CONVERSION_REGISTRY.document.sourceFormats).not.toContain("pdf");
+  });
+
+  it("XML/YAML are not advertised as data sources (no parser is integrated)", () => {
+    expect(CONVERSION_REGISTRY.data.sourceFormats).not.toContain("xml");
+    expect(CONVERSION_REGISTRY.data.sourceFormats).not.toContain("yaml");
+    expect(CONVERSION_REGISTRY.data.sourceFormats).not.toContain("yml");
+  });
+
+  it("XML/YAML remain honest targets (generated from parsed JSON/CSV/TSV)", () => {
+    expect(planConversion("data", "xml").supported).toBe(true);
+    expect(planConversion("data", "yaml").supported).toBe(true);
+    expect(planConversion("data", "csv").supported).toBe(true);
+    expect(planConversion("data", "tsv").supported).toBe(true);
+  });
+
+  it("HTML -> Markdown is not selectable for HTML sources, but stays for text sources", () => {
+    expect(getAvailableTargetsForSource("document", "html")).not.toContain("md");
+    expect(getAvailableTargetsForSource("document", "htm")).not.toContain("md");
+    expect(getAvailableTargetsForSource("document", "txt")).toContain("md");
+    expect(getAvailableTargetsForSource("document", "md")).toContain("md");
+  });
+
+  it("HTML sources default to an honest target (plain text), not Markdown", () => {
+    expect(CONVERSION_REGISTRY.document.defaultTarget("html")).toBe("txt");
+    expect(CONVERSION_REGISTRY.document.defaultTarget("htm")).toBe("txt");
   });
 });

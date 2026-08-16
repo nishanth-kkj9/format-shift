@@ -79,6 +79,8 @@ export interface ConversionItem {
   originalExtension: string;
   category: FileCategory;
   targetFormat: TargetFormat;
+  /** source-aware target formats this item may actually be converted to */
+  availableTargets: TargetFormat[];
   status: ConversionStatus;
   progress: number; // 0 to 100
   options: ConversionOptions;
@@ -108,7 +110,8 @@ export interface ConversionHistoryItem {
   originalSize: number;
   convertedSize: number;
   timestamp: string;
-  downloadUrl: string;
+  /** blob URL, session-scoped: absent for entries restored from storage */
+  downloadUrl?: string;
 }
 
 export interface CodeTemplateResponse {

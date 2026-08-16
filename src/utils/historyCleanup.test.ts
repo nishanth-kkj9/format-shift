@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { revokeHistoryUrls, clearHistoryRevoking } from "./historyCleanup";
+import { revokeHistoryUrls, clearHistoryRevoking, historyForStorage, hydrateHistory } from "./historyCleanup";
 import { ConversionHistoryItem } from "../types";
 
 function entry(id: string, downloadUrl: string): ConversionHistoryItem {
@@ -63,5 +63,28 @@ describe("clearHistoryRevoking (atomic clear vs queue race)", () => {
     const next = clearHistoryRevoking([entry("h1", "blob:gone")], new Set(), revoke);
     expect(next).toEqual([]);
     expect(revoke).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("history persistence (metadata only, never blob URLs)", () => {
+  it("strips session-scoped downloadUrl before writing to storage", () => {
+    const forStorage = historyForStorage([entry("1", "blob:dead-after-reload")]);
+    expect(forStorage[0].downloadUrl).toBeUndefined();
+    expect(forStorage[0].originalName).toBe("a.txt");
+    expect(forStorage[0].convertedSize).toBe(2);
+  });
+
+  it("drops stale blob URLs when hydrating persisted history", () => {
+    const raw = JSON.stringify([entry("1", "blob:stale"), { ...entry("2", "blob:also-stale"), id: "2" }]);
+    const restored = hydrateHistory(raw);
+    expect(restored).toHaveLength(2);
+    for (const item of restored) {
+      expect(item.downloadUrl).toBeUndefined();
+    }
+  });
+
+  it("handles missing or corrupt stored history", () => {
+    expect(hydrateHistory(null)).toEqual([]);
+    expect(hydrateHistory("{not json")).toEqual([]);
   });
 });

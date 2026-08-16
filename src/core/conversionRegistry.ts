@@ -26,6 +26,8 @@ export interface CategorySpec {
   sourceFormats: string[];
   /** allowed target formats -> how/whether they run */
   targets: Record<string, TargetSpec>;
+  /** per-source target exclusions: a source that a target cannot be produced from */
+  excludedTargetsBySource?: Record<string, string[]>;
   /** pick a sensible default target for a given source format */
   defaultTarget: (sourceFormat: string) => string;
 }
@@ -212,7 +214,9 @@ export const CONVERSION_REGISTRY: Record<FileCategory, CategorySpec> = {
   },
   data: {
     category: "data",
-    sourceFormats: ["json", "csv", "tsv", "xml", "yaml", "yml"],
+    // Only sources with a real parser are advertised. XML/YAML/yml are NOT
+    // parsed (no parser is integrated), so they are not honest data sources.
+    sourceFormats: ["json", "csv", "tsv"],
     targets: DATA_TARGETS,
     defaultTarget: (source) => (source === "json" ? "csv" : "json"),
   },
@@ -221,8 +225,10 @@ export const CONVERSION_REGISTRY: Record<FileCategory, CategorySpec> = {
     // No PDF parser is integrated; only text-based sources are honest here.
     sourceFormats: ["txt", "md", "html", "htm"],
     targets: DOCUMENT_TARGETS,
-    defaultTarget: (source) =>
-      source === "md" ? "html" : source === "html" || source === "htm" ? "md" : "html",
+    // HTML -> Markdown is not a real conversion (no HTML parser is
+    // integrated), so it must not be selectable for HTML sources.
+    excludedTargetsBySource: { html: ["md"], htm: ["md"] },
+    defaultTarget: (source) => (source === "md" ? "html" : source === "txt" ? "html" : "txt"),
   },
 };
 
@@ -248,6 +254,12 @@ export function planConversion(category: FileCategory, targetFormat: string): Co
 /** All target formats for a category, in a stable order. */
 export function getAvailableTargets(category: FileCategory): string[] {
   return Object.keys(CONVERSION_REGISTRY[category]?.targets ?? {});
+}
+
+/** Target formats for a category given a specific source format (source-aware). */
+export function getAvailableTargetsForSource(category: FileCategory, sourceFormat: string): string[] {
+  const excluded = CONVERSION_REGISTRY[category]?.excludedTargetsBySource?.[sourceFormat] ?? [];
+  return getAvailableTargets(category).filter((t) => !excluded.includes(t));
 }
 
 /** MIME type for a target format within a category (or null). */

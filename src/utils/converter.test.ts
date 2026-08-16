@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { jsonToCsv, csvToJson, jsonToXml, jsonToYaml, markdownToHtml, formatBytes } from "./converter";
+import { resolveTrimRange, renderFrameLength } from "./convertAudio";
 import { convertDataDocument } from "./convertData";
 import { convertAudio } from "./convertAudio";
 import { convertVideo } from "./convertVideo";
@@ -31,6 +32,24 @@ describe("jsonToCsv", () => {
   it("quotes values containing double quotes", () => {
     const input = [{ name: 'He said "hi"' }];
     expect(jsonToCsv(input)).toBe('name\n"He said ""hi"""');
+  });
+
+  it("uses the first record's keys as the schema (documented limitation)", () => {
+    const input = [
+      { id: 1, name: "Alice", extra: true },
+      { id: 2, name: "Bob" },
+    ];
+    expect(jsonToCsv(input)).toBe("id,name,extra\n1,Alice,true\n2,Bob,");
+  });
+
+  it("serializes nested objects/arrays into cells so they round-trip", () => {
+    const input = [{ id: 1, meta: { color: "red" }, tags: ["a", "b"] }];
+    expect(jsonToCsv(input)).toBe('id,meta,tags\n1,"{""color"":""red""}","[""a"",""b""]"');
+  });
+
+  it("guards against spreadsheet formula injection (=, +, -, @)", () => {
+    const input = [{ name: "=HYPERLINK(evil.com)", plus: "+1+1", minus: "-cmd", at: "@SUM(A1:A2)" }];
+    expect(jsonToCsv(input)).toBe("name,plus,minus,at\n'=HYPERLINK(evil.com),'+1+1,'-cmd,'@SUM(A1:A2)");
   });
 });
 
@@ -192,6 +211,36 @@ describe("markdownToHtml", () => {
   });
 });
 
+describe("audio trim range (N10)", () => {
+  it("resolves a valid trim range", () => {
+    expect(resolveTrimRange(10, 2, 6)).toEqual({ start: 2, end: 6 });
+  });
+
+  it("clamps an end beyond the audio to the full duration", () => {
+    expect(resolveTrimRange(10, 2, 20)).toEqual({ start: 2, end: 10 });
+  });
+
+  it("rejects trimStart at/after trimEnd instead of silently resetting it", () => {
+    expect(() => resolveTrimRange(10, 6, 6)).toThrow(/Invalid trim range/);
+    expect(() => resolveTrimRange(10, 8, 4)).toThrow(/Invalid trim range/);
+    expect(() => resolveTrimRange(10, 12, undefined)).toThrow(/Invalid trim range/);
+  });
+});
+
+describe("audio resampling frame length (N9)", () => {
+  it("renders the trimmed slice in frames at the TARGET sample rate", () => {
+    // 1s clip, no resample: 44100 frames at 44100 Hz
+    expect(renderFrameLength(1, 44100)).toBe(44100);
+    // 1s clip downsampled 44100 -> 22050: 22050 frames, NOT 44100 (that would stretch to 2s)
+    expect(renderFrameLength(1, 22050)).toBe(22050);
+    expect(renderFrameLength(1.5, 22050)).toBe(33075);
+  });
+
+  it("never renders zero frames", () => {
+    expect(renderFrameLength(0, 44100)).toBe(1);
+  });
+});
+
 describe("formatBytes", () => {
   it("formats zero bytes", () => {
     expect(formatBytes(0)).toBe("0 Bytes");
@@ -327,5 +376,16 @@ describe("convertDataDocument derives the MIME from the real category", () => {
     const file = fakeFile("data.json", "application/json", '{"a":1}');
     const res = await convertDataDocument(file, "csv", undefined, () => {});
     expect(res.blob.type).toBe("text/csv");
+  });
+
+  it("rejects HTML -> Markdown (no HTML parser is integrated)", async () => {
+    const file = fakeFile("page.html", "text/html", "<h1>Hi</h1><p>Body</p>");
+    await expect(convertDataDocument(file, "md", undefined, () => {})).rejects.toThrow(/HTML -> Markdown/);
+  });
+
+  it("still converts text -> Markdown honestly (pass-through)", async () => {
+    const file = fakeFile("notes.txt", "text/plain", "# heading");
+    const res = await convertDataDocument(file, "md", undefined, () => {});
+    expect(res.convertedText).toBe("# heading");
   });
 });

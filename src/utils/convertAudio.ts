@@ -85,6 +85,31 @@ function writeString(view: DataView, offset: number, string: string) {
   }
 }
 
+// Validate the requested trim range against the source duration. A provided
+// trimStart must be strictly before trimEnd (and within the audio); rejecting
+// invalid ranges beats silently ignoring the user's requested trim.
+export function resolveTrimRange(
+  durationSec: number,
+  trimStart?: number,
+  trimEnd?: number
+): { start: number; end: number } {
+  const start = trimStart ?? 0;
+  const end = trimEnd !== undefined && trimEnd < durationSec ? trimEnd : durationSec;
+  if (start < 0 || start >= end || start >= durationSec) {
+    throw new Error(
+      "Invalid trim range: trimStart must be earlier than trimEnd and within the audio duration"
+    );
+  }
+  return { start, end };
+}
+
+// OfflineAudioContext length is expressed in frames at the TARGET sample rate;
+// using the source rate here would stretch a resampled clip (e.g. a 1s clip at
+// 44100 -> 22050 would render 2s).
+export function renderFrameLength(durationSec: number, targetSampleRate: number): number {
+  return Math.max(1, Math.round(durationSec * targetSampleRate));
+}
+
 // Convert Audio / Extract Audio from Video using AudioContext & Web Audio API
 export async function convertAudio(
   file: File,
@@ -136,17 +161,13 @@ export async function convertAudio(
   onProgress?.(60);
   const duration = decodedBuffer.duration;
 
-  // Handle trim start / trim end
-  let startSec = options.trimStart || 0;
-  let endSec = options.trimEnd && options.trimEnd < duration ? options.trimEnd : duration;
-  if (startSec >= endSec) startSec = 0;
+  // Handle trim start / trim end (validated, never silently ignored)
+  const { start: startSec, end: endSec } = resolveTrimRange(duration, options.trimStart, options.trimEnd);
 
   const targetSampleRate = options.sampleRate || decodedBuffer.sampleRate;
   const numChannels = options.channels || Math.min(decodedBuffer.numberOfChannels, 2);
 
-  const startFrame = Math.floor(startSec * decodedBuffer.sampleRate);
-  const endFrame = Math.floor(endSec * decodedBuffer.sampleRate);
-  const frameLength = Math.max(1, endFrame - startFrame);
+  const frameLength = renderFrameLength(endSec - startSec, targetSampleRate);
 
   // Render to OfflineAudioContext
   const offlineCtx = new OfflineAudioContext(numChannels, frameLength, targetSampleRate);

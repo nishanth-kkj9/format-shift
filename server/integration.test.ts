@@ -294,6 +294,58 @@ describe("Multipart structural limits", () => {
   }, 30000);
 });
 
+describe("POST /api/code-template (scoped small body limit)", () => {
+  it("rejects an oversized JSON body before the handler runs", async () => {
+    const res = await fetch(`${base}/api/code-template`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      // only category/sourceFormat/targetFormat are consumed; way beyond the 10kb cap
+      body: JSON.stringify({ category: "image", padding: "x".repeat(64 * 1024) }),
+    });
+    expect(res.status).toBe(413);
+  }, 30000);
+
+  it("serves a normal code-template request", async () => {
+    const res = await fetch(`${base}/api/code-template`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ category: "image", sourceFormat: "png", targetFormat: "jpg" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.engine).toBe("browser");
+    expect(body.code.python).toContain("PIL");
+    expect(body.code.node).toContain("sharp");
+  }, 30000);
+
+  it("still rejects unsupported sources", async () => {
+    const res = await fetch(`${base}/api/code-template`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ category: "image", sourceFormat: "pdf", targetFormat: "jpg" }),
+    });
+    expect(res.status).toBe(400);
+  }, 30000);
+
+  it("rejects HTML -> Markdown as an unsupported source/target pair", async () => {
+    const res = await fetch(`${base}/api/code-template`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ category: "document", sourceFormat: "html", targetFormat: "md" }),
+    });
+    expect(res.status).toBe(400);
+  }, 30000);
+
+  it("rejects YAML as a data source (no parser is integrated)", async () => {
+    const res = await fetch(`${base}/api/code-template`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ category: "data", sourceFormat: "yaml", targetFormat: "json" }),
+    });
+    expect(res.status).toBe(400);
+  }, 30000);
+});
+
 describe("Health endpoint", () => {
   it("returns concurrency metrics", async () => {
     const res = await fetch(`${base}/api/health`);

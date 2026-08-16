@@ -186,6 +186,8 @@ interface FormatDropdownProps {
   value: TargetFormat;
   onChange: (format: TargetFormat) => void;
   category: FileCategory;
+  /** optional source-aware whitelist; falls back to all category targets */
+  availableFormats?: string[];
   disabled?: boolean;
 }
 
@@ -193,6 +195,7 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
   value,
   onChange,
   category,
+  availableFormats,
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -206,7 +209,9 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const options = FORMAT_OPTIONS[category] || FORMAT_OPTIONS.image;
+  const options = availableFormats
+    ? FORMAT_OPTIONS[category].filter((o) => availableFormats.includes(o.format))
+    : FORMAT_OPTIONS[category] || FORMAT_OPTIONS.image;
   const selectedOption = options.find((o) => o.format === value) || options[0];
   const SelectedIcon = selectedOption.icon;
 

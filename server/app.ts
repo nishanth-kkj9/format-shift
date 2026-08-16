@@ -8,7 +8,13 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { convertRouter } from "./routes/convert";
 import { templatesRouter } from "./routes/templates";
-import { getFFmpegConcurrency, FFMPEG_BIN } from "./ffmpeg/runner";
+import {
+  getFFmpegConcurrency,
+  getFFmpegVersion,
+  isFfmpegAtLeast,
+  MIN_FFMPEG_VERSION,
+  FFMPEG_BIN,
+} from "./ffmpeg/runner";
 import { env } from "./config";
 
 const app = express();
@@ -29,7 +35,11 @@ if (env.ENABLE_HSTS) {
   });
 }
 
-app.use(express.json({ limit: "50mb" }));
+// JSON body parsing is scoped per-route: /api/code-template mounts its own
+// small-limit parser, and /api/convert is multipart (busboy). Nothing else
+// consumes JSON, so no global 50mb JSON surface.
+// urlencoded is intentionally left as-is: no route consumes form bodies, and
+// tightening/removing it is out of scope for this finding.
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Standard hardening headers via helmet. CSP must allow the dev server's Vite
@@ -93,11 +103,14 @@ app.use((req, res, next) => {
 // API endpoints
 app.get("/api/health", (_req, res) => {
   const concurrency = getFFmpegConcurrency();
+  const ffmpegVersion = getFFmpegVersion();
   res.json({
     status: "ok",
     app: "FormatShift Universal Converter",
     timestamp: new Date().toISOString(),
     ffmpeg: FFMPEG_BIN ? "available" : "missing",
+    ffmpegVersion,
+    ffmpegVersionOk: isFfmpegAtLeast(ffmpegVersion, MIN_FFMPEG_VERSION),
     ffmpegConcurrency: {
       max: concurrency.max,
       active: concurrency.active,

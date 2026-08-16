@@ -1,5 +1,5 @@
 import { TargetFormat, SocialMediaPreset } from "../types";
-import { CONVERSION_REGISTRY, getAvailableTargets, FileCategory } from "../core/conversionRegistry";
+import { CONVERSION_REGISTRY, getAvailableTargetsForSource, FileCategory } from "../core/conversionRegistry";
 
 // Social Media Preset Dimensions Map
 export const SOCIAL_PRESETS: Record<
@@ -38,7 +38,7 @@ export function detectCategoryAndFormats(file: File): {
       category: "image",
       sourceFormat,
       defaultTargetFormat: CONVERSION_REGISTRY.image.defaultTarget(sourceFormat) as TargetFormat,
-      availableTargets: getAvailableTargets("image") as TargetFormat[],
+      availableTargets: getAvailableTargetsForSource("image", sourceFormat) as TargetFormat[],
     };
   }
 
@@ -49,7 +49,7 @@ export function detectCategoryAndFormats(file: File): {
       category: "audio",
       sourceFormat,
       defaultTargetFormat: CONVERSION_REGISTRY.audio.defaultTarget(sourceFormat) as TargetFormat,
-      availableTargets: getAvailableTargets("audio") as TargetFormat[],
+      availableTargets: getAvailableTargetsForSource("audio", sourceFormat) as TargetFormat[],
     };
   }
 
@@ -60,18 +60,18 @@ export function detectCategoryAndFormats(file: File): {
       category: "video",
       sourceFormat,
       defaultTargetFormat: CONVERSION_REGISTRY.video.defaultTarget(sourceFormat) as TargetFormat,
-      availableTargets: getAvailableTargets("video") as TargetFormat[],
+      availableTargets: getAvailableTargetsForSource("video", sourceFormat) as TargetFormat[],
     };
   }
 
   // 4. Data Formats
-  if (DATA_EXTS.has(ext) || type.includes("json") || type.includes("csv") || type.includes("xml")) {
+  if (DATA_EXTS.has(ext) || type.includes("json") || type.includes("csv")) {
     const sourceFormat = ext || "json";
     return {
       category: "data",
       sourceFormat,
       defaultTargetFormat: CONVERSION_REGISTRY.data.defaultTarget(sourceFormat) as TargetFormat,
-      availableTargets: getAvailableTargets("data") as TargetFormat[],
+      availableTargets: getAvailableTargetsForSource("data", sourceFormat) as TargetFormat[],
     };
   }
 
@@ -81,11 +81,16 @@ export function detectCategoryAndFormats(file: File): {
   if (ext === "pdf" || type === "application/pdf") {
     throw new Error("PDF files are not supported for document conversion");
   }
+  // XML/YAML are likewise not honest data sources: no parser is integrated, so
+  // they must not be selectable as convertible sources.
+  if (ext === "xml" || ext === "yaml" || ext === "yml") {
+    throw new Error("XML/YAML source parsing is not supported; convert JSON/CSV/TSV instead");
+  }
   const sourceFormat = ext || "txt";
   return {
     category: "document",
     sourceFormat,
     defaultTargetFormat: CONVERSION_REGISTRY.document.defaultTarget(sourceFormat) as TargetFormat,
-    availableTargets: getAvailableTargets("document") as TargetFormat[],
+    availableTargets: getAvailableTargetsForSource("document", sourceFormat) as TargetFormat[],
   };
 }

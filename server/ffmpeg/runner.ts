@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from "node:child_process";
+import { spawn, ChildProcess, execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,6 +28,51 @@ function resolveFfmpegBinary(): string {
 }
 
 export const FFMPEG_BIN: string = resolveFfmpegBinary();
+
+/**
+ * Oldest FFmpeg release the app relies on: 4.2 introduced the ico muxer used by
+ * the image pipeline; every audio/video target needs far less. Local dev
+ * falls back to ffmpeg-static 5.3.0 (ships FFmpeg 6.1.1); Docker installs the
+ * distro package and points FFMPEG_PATH at it. The resolved binary's version is
+ * observed at runtime and reported on /api/health — nothing fails hard here so
+ * CI/dev environments without a binary keep working.
+ */
+export const MIN_FFMPEG_VERSION = "4.2.0";
+
+/** Parse `ffmpeg -version` output into "major.minor.patch", or null. */
+export function parseFfmpegVersion(output: string): string | null {
+  const m = /ffmpeg version (?:n)?(\d+)\.(\d+)\.(\d+)/.exec(output);
+  if (!m) return null;
+  return `${m[1]}.${m[2]}.${m[3]}`;
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** True when `version` parses and is >= `min`. */
+export function isFfmpegAtLeast(version: string | null, min: string): boolean {
+  return version !== null && compareVersions(version, min) >= 0;
+}
+
+let cachedVersion: string | null | undefined;
+
+/** Version of the resolved ffmpeg binary, or null when it can't be determined. Cached. */
+export function getFFmpegVersion(): string | null {
+  if (cachedVersion !== undefined) return cachedVersion;
+  try {
+    cachedVersion = parseFfmpegVersion(execFileSync(FFMPEG_BIN, ["-version"], { encoding: "utf8" }));
+  } catch {
+    cachedVersion = null;
+  }
+  return cachedVersion;
+}
 
 export interface FFmpegResult {
   /** path to the completed output file */

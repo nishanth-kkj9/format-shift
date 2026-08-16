@@ -16,6 +16,11 @@ export async function convertDataDocument(
   if (!browserDataTargets.includes(tgt)) {
     throw new Error(`Document/Data -> ${targetFormat} is not supported; use a server engine`);
   }
+  // HTML -> Markdown is not a real conversion (no HTML parser is integrated);
+  // passing HTML markup through as markdown would be dishonest.
+  if (tgt === "md" && /\.html?$/i.test(file.name)) {
+    throw new Error("HTML -> Markdown is not supported; no HTML parser is integrated");
+  }
   let resultText = "";
   let sourceIsData = false;
 
@@ -143,9 +148,12 @@ export function jsonToCsv(json: unknown, delimiter = ","): string {
         const val = record[header];
         if (val === null || val === undefined) return "";
         const strVal = typeof val === "object" ? JSON.stringify(val) : String(val);
-        return strVal.includes(delimiter) || strVal.includes("\n") || strVal.includes('"')
-          ? `"${strVal.replace(/"/g, '""')}"`
-          : strVal;
+        // Spreadsheet formula injection guard: prefix cells that start with
+        // =,+,-,@ (OWASP CSV injection) so Excel/sheets treat them as text.
+        const guarded = /^[=+\-@]/.test(strVal) && !strVal.startsWith('"') ? "'" + strVal : strVal;
+        return guarded.includes(delimiter) || guarded.includes("\n") || guarded.includes('"')
+          ? `"${guarded.replace(/"/g, '""')}"`
+          : guarded;
       })
       .join(delimiter);
   });

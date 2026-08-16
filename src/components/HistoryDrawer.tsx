@@ -102,14 +102,23 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose, h
                       </div>
                     </div>
 
-                    <a
-                      href={item.downloadUrl}
-                      download={item.convertedName}
-                      className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shrink-0 cursor-pointer shadow-md"
-                      title="Download File"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
+                    {item.downloadUrl ? (
+                      <a
+                        href={item.downloadUrl}
+                        download={item.convertedName}
+                        className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shrink-0 cursor-pointer shadow-md"
+                        title="Download File"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                    ) : (
+                      <span
+                        className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-white/5 text-slate-500 shrink-0"
+                        title="This entry was restored from storage; the converted file only lives for the session in which it was created."
+                      >
+                        Session only
+                      </span>
+                    )}
                   </motion.div>
                 ))
               )}

@@ -1,8 +1,18 @@
-import { Router } from "express";
-import { planConversion, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
+import { Router, json } from "express";
+import {
+  planConversion,
+  getAvailableTargetsForSource,
+  CONVERSION_REGISTRY,
+} from "../../src/core/conversionRegistry";
 import type { FileCategory } from "../../src/core/conversionRegistry";
 
 export const templatesRouter = Router();
+
+// /api/code-template only needs category/sourceFormat/targetFormat. Scope the
+// body parser to this route with a small limit so oversized template requests
+// are rejected (413) during parsing, before the handler runs, instead of being
+// buffered by a global 50mb JSON parser.
+templatesRouter.use(json({ limit: "10kb" }));
 
 // Code generator endpoint for Python & Node.js code snippets.
 // Allowed targets are derived from the shared conversion registry, so the API
@@ -23,6 +33,11 @@ templatesRouter.post("/", (req, res) => {
   const plan = planConversion(cat, tgt);
   if (plan.supported === false) {
     return res.status(400).json({ error: plan.reason });
+  }
+  // Source-aware honesty: reject a target the source genuinely cannot be
+  // converted to (e.g. HTML -> Markdown), even if it exists in the category.
+  if (!getAvailableTargetsForSource(cat, src).includes(tgt)) {
+    return res.status(400).json({ error: `${src} -> ${tgt} is not a supported conversion for ${cat}` });
   }
 
   const engine = plan.target.engine;

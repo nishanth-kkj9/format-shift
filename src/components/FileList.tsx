@@ -217,6 +217,7 @@ export const FileList: React.FC<FileListProps> = ({
                         value={item.targetFormat}
                         onChange={(fmt) => onTargetFormatChange(item.id, fmt)}
                         category={item.category}
+                        availableFormats={item.availableTargets}
                         disabled={isConverting}
                       />
 
