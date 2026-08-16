@@ -3,7 +3,7 @@ export type FileCategory = "image" | "audio" | "video" | "document" | "data";
 export type ImageFormat = "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico" | "svg" | "avif";
 export type AudioFormat = "mp3" | "wav" | "ogg" | "aac" | "m4a" | "flac";
 export type VideoFormat = "mp4" | "webm" | "gif" | "mov" | "mkv" | "avi";
-export type DocumentFormat = "pdf" | "txt" | "md" | "html";
+export type DocumentFormat = "txt" | "md" | "html";
 export type DataFormat = "json" | "csv" | "xml" | "yaml" | "tsv";
 
 export type TargetFormat = ImageFormat | AudioFormat | VideoFormat | DocumentFormat | DataFormat;

@@ -42,7 +42,14 @@ export function imageArgs(opts: ConvertOptions): string[] {
   // codec, image2 defaults to mjpeg when the output path has no extension.
   const codec = imageCodec(tgt);
   const codecArgs = codec ? ["-c:v", codec] : [];
-  const outFmt = tgt === "gif" ? ["-f", "gif"] : tgt === "jpg" ? ["-f", "mjpeg"] : ["-f", "image2"];
+  const outFmt =
+    tgt === "gif"
+      ? ["-f", "gif"]
+      : tgt === "ico"
+        ? ["-f", "ico"]
+        : tgt === "jpg"
+          ? ["-f", "mjpeg"]
+          : ["-f", "image2"];
   return [...imageFilters(opts), ...codecArgs, ...outFmt];
 }
 

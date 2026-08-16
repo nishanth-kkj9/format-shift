@@ -159,19 +159,31 @@ describe("parseUploadStream", () => {
     }
   });
 
-  it("resolves source-only mimes via fallback map (pdf)", async () => {
+  it("resolves source-only mimes via fallback map (audio/x-m4a)", async () => {
+    const payload = multipartBody([
+      { name: "category", value: "audio" },
+      { name: "targetFormat", value: "mp3" },
+      { name: "options", value: "{}" },
+      { name: "file", filename: "song.m4a", type: "audio/x-m4a", data: Buffer.from("hello") },
+    ]);
+    const up = await parseUploadStream(fakeReq(payload, { "x-category": "audio" }));
+    try {
+      expect(up.sourceFormat).toBe("m4a");
+    } finally {
+      cleanup(up.tempDir, up.filePath);
+    }
+  });
+
+  it("rejects PDF uploads for the document category", async () => {
     const payload = multipartBody([
       { name: "category", value: "document" },
       { name: "targetFormat", value: "txt" },
       { name: "options", value: "{}" },
       { name: "file", filename: "doc.pdf", type: "application/pdf", data: Buffer.from("%PDF-1.4 hello") },
     ]);
-    const up = await parseUploadStream(fakeReq(payload, { "x-category": "document" }));
-    try {
-      expect(up.sourceFormat).toBe("pdf");
-    } finally {
-      cleanup(up.tempDir, up.filePath);
-    }
+    await expect(parseUploadStream(fakeReq(payload, { "x-category": "document" }))).rejects.toMatchObject({
+      status: 400,
+    });
   });
 
   it("prefers header category over the form field", async () => {

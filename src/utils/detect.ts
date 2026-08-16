@@ -76,6 +76,11 @@ export function detectCategoryAndFormats(file: File): {
   }
 
   // 5. Document Formats
+  // PDF is not an honest document source here: no PDF parser is integrated, so
+  // converting one would just feed its raw bytes through the text pipeline.
+  if (ext === "pdf" || type === "application/pdf") {
+    throw new Error("PDF files are not supported for document conversion");
+  }
   const sourceFormat = ext || "txt";
   return {
     category: "document",

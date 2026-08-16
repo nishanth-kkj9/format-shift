@@ -43,6 +43,10 @@ describe("detectCategoryAndFormats", () => {
     expect(r.availableTargets.length).toBeGreaterThan(0);
     expect(r.availableTargets).toContain(r.defaultTargetFormat);
   });
+
+  it("throws for PDF files (no PDF parser is integrated)", () => {
+    expect(() => detectCategoryAndFormats(fakeFile("doc.pdf", "application/pdf"))).toThrow(/PDF/);
+  });
 });
 
 describe("SOCIAL_PRESETS", () => {

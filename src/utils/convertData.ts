@@ -1,4 +1,4 @@
-import { TargetFormat, DataConversionOptions } from "../types";
+import { FileCategory, TargetFormat, DataConversionOptions } from "../types";
 import { getMimeForTarget } from "../core/conversionRegistry";
 
 export async function convertDataDocument(
@@ -17,9 +17,11 @@ export async function convertDataDocument(
     throw new Error(`Document/Data -> ${targetFormat} is not supported; use a server engine`);
   }
   let resultText = "";
+  let sourceIsData = false;
 
   try {
     if (file.name.endsWith(".json") || isJson(text)) {
+      sourceIsData = true;
       const parsed = JSON.parse(text);
       if (tgt === "csv" || tgt === "tsv") {
         const sep = tgt === "tsv" || options?.delimiter === "\t" ? "\t" : options?.delimiter || ",";
@@ -35,6 +37,7 @@ export async function convertDataDocument(
         resultText = JSON.stringify(parsed, null, options?.indentSpaces || 2);
       }
     } else if (/^[^"']*[,\t]/.test(text.trim())) {
+      sourceIsData = true;
       const sep = file.name.endsWith(".tsv") || file.name.endsWith(".tab") ? "\t" : ",";
       const parsedJson = csvToJson(text, sep);
       if (tgt === "json") {
@@ -64,7 +67,7 @@ export async function convertDataDocument(
 
   onProgress?.(90);
 
-  const category = "data" as const;
+  const category: FileCategory = sourceIsData ? "data" : "document";
   const mimeType = getMimeForTarget(category, tgt) || "text/plain";
 
   const blob = new Blob([resultText], { type: mimeType });

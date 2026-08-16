@@ -301,3 +301,31 @@ describe("browser converters refuse unsupported targets", () => {
     expect(planConversion("image", "docx").supported).toBe(false);
   });
 });
+
+describe("convertDataDocument derives the MIME from the real category", () => {
+  const fakeFile = (name: string, type: string, content: BlobPart) => new File([content], name, { type });
+
+  it("document -> html produces text/html", async () => {
+    const file = fakeFile("notes.txt", "text/plain", "# hello");
+    const res = await convertDataDocument(file, "html", undefined, () => {});
+    expect(res.blob.type).toBe("text/html");
+  });
+
+  it("document -> md produces text/markdown", async () => {
+    const file = fakeFile("notes.txt", "text/plain", "# hello");
+    const res = await convertDataDocument(file, "md", undefined, () => {});
+    expect(res.blob.type).toBe("text/markdown");
+  });
+
+  it("data -> json stays application/json", async () => {
+    const file = fakeFile("data.csv", "text/csv", "a,b\n1,2");
+    const res = await convertDataDocument(file, "json", undefined, () => {});
+    expect(res.blob.type).toBe("application/json");
+  });
+
+  it("data -> csv stays text/csv", async () => {
+    const file = fakeFile("data.json", "application/json", '{"a":1}');
+    const res = await convertDataDocument(file, "csv", undefined, () => {});
+    expect(res.blob.type).toBe("text/csv");
+  });
+});

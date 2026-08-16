@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { imageFilters } from "./ffmpeg/filters";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { imageArgs, imageFilters } from "./ffmpeg/filters";
+import { runFFmpeg } from "./ffmpeg/runner";
 import { validateOptions, InvalidOptionError } from "./convert";
 import {
   acquireFFmpegSlot,
@@ -50,6 +54,37 @@ describe("imageFilters", () => {
     const result = imageFilters({ targetFormat: "ico", category: "image" });
     expect(result.join(" ")).toContain("scale=32:32");
   });
+});
+
+describe("ico conversion output", () => {
+  const TINY_PNG = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+
+  it("uses the ico muxer so output bytes are a real ICO file", async () => {
+    const args = imageArgs({ targetFormat: "ico", category: "image" });
+    expect(args).toContain("-f");
+    expect(args[args.indexOf("-f") + 1]).toBe("ico");
+
+    const dir = mkdtempSync(join(tmpdir(), "fs-ico-test-"));
+    try {
+      const inputPath = join(dir, "in.png");
+      writeFileSync(inputPath, TINY_PNG);
+      const { outPath, cleanup } = await runFFmpeg(args, { inputPath });
+      try {
+        const { readFileSync } = await import("node:fs");
+        const out = readFileSync(outPath);
+        // ICO header: reserved=0x0000, type=0x0001 (icon)
+        expect(out.subarray(0, 2).equals(Buffer.from([0x00, 0x00]))).toBe(true);
+        expect(out.subarray(2, 4).equals(Buffer.from([0x01, 0x00]))).toBe(true);
+      } finally {
+        cleanup();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30000);
 });
 
 describe("validateOptions", () => {
@@ -235,6 +270,63 @@ describe("ffmpeg concurrency queue", () => {
       releaseFFmpegSlot(); // release the queued job's slot
     } finally {
       for (let i = 0; i < max - 1; i++) releaseFFmpegSlot();
+    }
+  });
+
+  it("rejects immediately when the signal is already aborted", async () => {
+    const { active, queued } = getFFmpegConcurrency();
+    const controller = new AbortController();
+    controller.abort();
+    await expect(acquireFFmpegSlot(controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    // no slot was consumed
+    expect(getFFmpegConcurrency()).toEqual({ max: expect.any(Number), active, queued });
+  });
+
+  it("removes an aborted job from the queue", async () => {
+    const { max } = getFFmpegConcurrency();
+    for (let i = 0; i < max; i++) await acquireFFmpegSlot();
+    try {
+      const controller = new AbortController();
+      const queued = acquireFFmpegSlot(controller.signal);
+      expect(getFFmpegConcurrency().queued).toBe(1);
+      controller.abort();
+      await expect(queued).rejects.toMatchObject({ name: "AbortError" });
+      expect(getFFmpegConcurrency().queued).toBe(0);
+    } finally {
+      for (let i = 0; i < max; i++) releaseFFmpegSlot();
+    }
+  });
+
+  it("frees the slot for the next waiter after an abort", async () => {
+    const { max } = getFFmpegConcurrency();
+    for (let i = 0; i < max; i++) await acquireFFmpegSlot();
+    try {
+      const aborted = new AbortController();
+      const doomed = acquireFFmpegSlot(aborted.signal);
+      aborted.abort();
+      await expect(doomed).rejects.toMatchObject({ name: "AbortError" });
+
+      const survivor = acquireFFmpegSlot();
+      releaseFFmpegSlot(); // frees the slot the aborted job would have taken
+      await survivor; // the next queued job still gets a slot
+      releaseFFmpegSlot();
+    } finally {
+      for (let i = 0; i < max - 1; i++) releaseFFmpegSlot();
+    }
+  });
+
+  it("runFFmpeg rejects with AbortError when the signal aborts while queued", async () => {
+    const { max } = getFFmpegConcurrency();
+    for (let i = 0; i < max; i++) await acquireFFmpegSlot();
+    try {
+      const controller = new AbortController();
+      const pending = runFFmpeg(["-version"], { signal: controller.signal });
+      expect(getFFmpegConcurrency().queued).toBe(1);
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+      expect(getFFmpegConcurrency().queued).toBe(0);
+    } finally {
+      for (let i = 0; i < max; i++) releaseFFmpegSlot();
     }
   });
 });

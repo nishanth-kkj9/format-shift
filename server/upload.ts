@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
 import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import Busboy from "busboy";
 import { fileTypeFromBuffer } from "file-type";
 import type { IncomingMessage } from "node:http";
@@ -54,7 +55,7 @@ const ALLOWED_MIME: Record<string, string[]> = {
     "audio/webm",
   ],
   video: ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/x-flv"],
-  document: ["application/pdf", "text/plain", "text/markdown", "text/html"],
+  document: ["text/plain", "text/markdown", "text/html"],
   data: [
     "application/json",
     "text/csv",
@@ -76,9 +77,8 @@ const MAX_SIZES: Record<string, number> = {
 const GLOBAL_MAX_SIZE = 200 * 1024 * 1024; // hard cap regardless of category
 
 // Client MIME types that don't appear in the registry's target table but are
-// legitimate sources (e.g. PDF has no ffmpeg target, x-* audio/video variants).
+// legitimate sources (x-* audio/video variants).
 const MIME_SOURCE_FALLBACK: Record<string, string> = {
-  "application/pdf": "pdf",
   "audio/x-wav": "wav",
   "audio/x-m4a": "m4a",
   "audio/webm": "weba",
@@ -142,50 +142,74 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
 
     const busboy = Busboy({
       headers: req.headers,
-      // +1 so a file exactly at the category cap is fully written and accepted;
-      // anything over it trips the limit and is rejected by the post-parse check.
-      limits: { fileSize: categoryMaxSize + 1 },
+      limits: {
+        // +1 so a file exactly at the category cap is fully written and accepted;
+        // anything over it trips the limit and is rejected by the post-parse check.
+        fileSize: categoryMaxSize + 1,
+        // Structural caps: bounded multipart surface so a malformed/abusive body
+        // cannot spawn unbounded parts/fields/file writes. The frontend sends
+        // file + category + targetFormat + options (4 parts, 4 fields).
+        parts: 16,
+        fields: 16,
+        files: 1,
+        headerPairs: 64,
+      },
     });
 
-    busboy.on(
-      "file",
-      (_name: string, stream: NodeJS.ReadableStream, info: { mimeType: string; filename: string }) => {
-        mimetype = info.mimeType;
-        originalFilename = info.filename || "upload.bin";
-        filePath = join(tempDir, `input-${randomBytes(8).toString("hex")}.bin`);
-        const writeStream = createWriteStream(filePath);
-
-        // Track total size + keep the first 8KB for magic-byte sniffing.
-        stream.on("data", (chunk: Buffer) => {
-          size += chunk.length;
-          if (headBytes < 8192) {
-            const take = Math.min(8192 - headBytes, chunk.length);
-            head.push(chunk.subarray(0, take));
-            headBytes += take;
-          }
-        });
-
-        // Busboy fires this when the file stream is truncated at the size cap.
-        stream.on("limit", () => {
-          if (!abortError) {
-            abortError = new UploadError(
-              `File too large for ${categoryFromMeta || "upload"} category (max ${categoryMaxSize / 1024 / 1024}MB)`,
-              413
-            );
-          }
-        });
-
-        // pipeline() keeps memory O(chunk) and only resolves after every byte has
-        // been flushed to the write stream — parseUploadStream never returns while
-        // the file is still being written. Errors are captured into abortError.
-        const writeDone = pipeline(stream, writeStream).catch((err: Error) => {
-          if (!abortError) {
-            abortError = new UploadError(`Failed to write upload to disk: ${err.message}`, 500);
-          }
-        });
-        writePipelines.push(writeDone);
+    busboy.on("file", (_name: string, stream: Readable, info: { mimeType: string; filename: string }) => {
+      // A previous part already tripped a limit: drain remaining parts without
+      // touching the disk so an abusive body can't cause repeated large writes.
+      if (abortError) {
+        stream.resume();
+        return;
       }
-    );
+      mimetype = info.mimeType;
+      originalFilename = info.filename || "upload.bin";
+      filePath = join(tempDir, `input-${randomBytes(8).toString("hex")}.bin`);
+      const writeStream = createWriteStream(filePath);
+
+      // Track total size + keep the first 8KB for magic-byte sniffing.
+      stream.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > GLOBAL_MAX_SIZE && !abortError) {
+          abortError = new UploadError(
+            `Upload exceeds the global limit of ${GLOBAL_MAX_SIZE / 1024 / 1024}MB`,
+            413
+          );
+          // Stop writing and parsing immediately; the catch/cleanup path removes
+          // the partially written file and temp dir.
+          stream.destroy();
+          writeStream.destroy();
+          busboy.destroy();
+          return;
+        }
+        if (headBytes < 8192) {
+          const take = Math.min(8192 - headBytes, chunk.length);
+          head.push(chunk.subarray(0, take));
+          headBytes += take;
+        }
+      });
+
+      // Busboy fires this when the file stream is truncated at the size cap.
+      stream.on("limit", () => {
+        if (!abortError) {
+          abortError = new UploadError(
+            `File too large for ${categoryFromMeta || "upload"} category (max ${categoryMaxSize / 1024 / 1024}MB)`,
+            413
+          );
+        }
+      });
+
+      // pipeline() keeps memory O(chunk) and only resolves after every byte has
+      // been flushed to the write stream — parseUploadStream never returns while
+      // the file is still being written. Errors are captured into abortError.
+      const writeDone = pipeline(stream, writeStream).catch((err: Error) => {
+        if (!abortError) {
+          abortError = new UploadError(`Failed to write upload to disk: ${err.message}`, 500);
+        }
+      });
+      writePipelines.push(writeDone);
+    });
 
     busboy.on("field", (name: string, val: string) => {
       fields[name] = val;
@@ -193,10 +217,20 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
 
     busboy.on("error", (err: Error) => {
       if (!abortError) {
-        const isSizeLimit = /file size|size limit/i.test(err.message);
+        const isSizeLimit = /file size|size limit|limit exceeded/i.test(err.message);
         abortError = new UploadError(err.message, isSizeLimit ? 413 : 400);
       }
     });
+
+    for (const [event, msg] of [
+      ["partsLimit", "Upload has too many parts"],
+      ["fieldsLimit", "Upload has too many fields"],
+      ["filesLimit", "Upload has too many files"],
+    ] as const) {
+      busboy.on(event, () => {
+        if (!abortError) abortError = new UploadError(msg, 413);
+      });
+    }
 
     req.pipe(busboy);
     // once() rejects if busboy emits 'error' before 'close'; swallow it here and

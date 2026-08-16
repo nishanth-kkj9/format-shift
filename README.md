@@ -186,7 +186,7 @@ The multipart parser also has an overall 200 MB Busboy file-size limit.
 
 - React 19
 - TypeScript 5.8
-- Vite 6
+- Vite 8
 - Tailwind CSS 4
 - Motion
 - Lucide React
@@ -195,7 +195,7 @@ The multipart parser also has an overall 200 MB Busboy file-size limit.
 ### Backend
 
 - Node.js 20+
-- Express 4
+- Express 5
 - TypeScript
 - `tsx`
 - `ffmpeg-static`

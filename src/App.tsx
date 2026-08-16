@@ -10,6 +10,7 @@ import {
   convertDataDocument,
 } from "./utils/converter";
 import { extractFileMetadata } from "./utils/metadata";
+import { clearHistoryRevoking } from "./utils/historyCleanup";
 import { convertServerSide, needsServerConversion } from "./utils/serverConvert";
 
 import { Header } from "./components/Header";
@@ -61,6 +62,12 @@ export default function App() {
   // Track in-flight abort controllers so the UI can cancel conversions.
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
+  // URLs currently referenced by queue items, kept in sync at the exact
+  // transitions where those references begin (conversion) and end (remove /
+  // clear all). Clear History reads this ref inside its state updater so the
+  // retained set is atomic with the history transition, never render-captured.
+  const queueUrlsRef = useRef<Set<string>>(new Set());
+
   // Sync theme class to <html> tag
   useEffect(() => {
     if (isDark) {
@@ -82,18 +89,25 @@ export default function App() {
   // Add Files to Queue with Auto-Detection & Async Metadata Extraction
   const handleFilesAdded = (files: File[]) => {
     const newItems: ConversionItem[] = files.map((file) => {
-      const { category, sourceFormat, defaultTargetFormat } = detectCategoryAndFormats(file);
+      let detected: ReturnType<typeof detectCategoryAndFormats> | null = null;
+      let detectError: string | null = null;
+      try {
+        detected = detectCategoryAndFormats(file);
+      } catch (err) {
+        detectError = err instanceof Error ? err.message : "Unsupported file type";
+      }
 
       const newItem: ConversionItem = {
         id: Math.random().toString(36).substring(2, 9),
         file,
         name: file.name,
         originalSize: file.size,
-        originalExtension: sourceFormat,
-        category,
-        targetFormat: defaultTargetFormat,
-        status: "idle",
+        originalExtension: detected?.sourceFormat || (file.name.split(".").pop() || "").toLowerCase(),
+        category: detected?.category || "document",
+        targetFormat: detected?.defaultTargetFormat || "txt",
+        status: detectError ? "error" : "idle",
         progress: 0,
+        errorMessage: detectError || undefined,
         options: {
           image: {
             quality: 85,
@@ -124,21 +138,23 @@ export default function App() {
       };
 
       // Asynchronously extract metadata (preview image, duration, dimensions)
-      extractFileMetadata(file).then((meta) => {
-        setQueue((prev) =>
-          prev.map((item) =>
-            item.id === newItem.id
-              ? {
-                  ...item,
-                  previewUrl: meta.previewUrl,
-                  dimensions: meta.dimensions,
-                  duration: meta.duration,
-                  lineCount: meta.lineCount,
-                }
-              : item
-          )
-        );
-      });
+      if (!detectError) {
+        extractFileMetadata(file).then((meta) => {
+          setQueue((prev) =>
+            prev.map((item) =>
+              item.id === newItem.id
+                ? {
+                    ...item,
+                    previewUrl: meta.previewUrl,
+                    dimensions: meta.dimensions,
+                    duration: meta.duration,
+                    lineCount: meta.lineCount,
+                  }
+                : item
+            )
+          );
+        });
+      }
 
       return newItem;
     });
@@ -260,6 +276,7 @@ export default function App() {
       }
 
       const convertedUrl = URL.createObjectURL(resultBlob);
+      queueUrlsRef.current.add(convertedUrl);
       const nameWithoutExt = item.name.substring(0, item.name.lastIndexOf(".")) || item.name;
       const extFromMime = (t: string) =>
         t === "video/webm"
@@ -409,6 +426,9 @@ export default function App() {
   const handleRemove = (id: string) => {
     setQueue((prev) => {
       const item = prev.find((i) => i.id === id);
+      if (item?.convertedUrl) {
+        queueUrlsRef.current.delete(item.convertedUrl);
+      }
       if (item?.previewUrl) {
         URL.revokeObjectURL(item.previewUrl);
       }
@@ -423,6 +443,7 @@ export default function App() {
   // Clear All Queue
   const handleClearAll = () => {
     setQueue((prev) => {
+      queueUrlsRef.current.clear();
       prev.forEach((item) => {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
         // Only revoke convertedUrl if it's not referenced in history
@@ -432,6 +453,13 @@ export default function App() {
       });
       return [];
     });
+  };
+
+  // Clear History (revokes removed blob URLs, never a URL still shown by a queue item)
+  const handleClearHistory = () => {
+    // queueUrlsRef is current at updater time (it is synced synchronously at
+    // every queue URL transition), so retention is atomic with the history clear.
+    setHistory((prev) => clearHistoryRevoking(prev, queueUrlsRef.current));
   };
 
   const filteredQueue =
@@ -620,7 +648,7 @@ export default function App() {
           isOpen={isHistoryOpen}
           onClose={() => setIsHistoryOpen(false)}
           history={history}
-          onClearHistory={() => setHistory([])}
+          onClearHistory={handleClearHistory}
         />
 
         <CodeSnippetModal

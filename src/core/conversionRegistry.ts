@@ -218,7 +218,8 @@ export const CONVERSION_REGISTRY: Record<FileCategory, CategorySpec> = {
   },
   document: {
     category: "document",
-    sourceFormats: ["pdf", "txt", "md", "html", "htm"],
+    // No PDF parser is integrated; only text-based sources are honest here.
+    sourceFormats: ["txt", "md", "html", "htm"],
     targets: DOCUMENT_TARGETS,
     defaultTarget: (source) =>
       source === "md" ? "html" : source === "html" || source === "htm" ? "md" : "html",

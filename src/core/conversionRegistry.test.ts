@@ -104,4 +104,8 @@ describe("conversion registry consistency", () => {
       expect(Object.keys(spec.targets).length).toBeGreaterThan(0);
     }
   });
+
+  it("PDF is not advertised as a document source", () => {
+    expect(CONVERSION_REGISTRY.document.sourceFormats).not.toContain("pdf");
+  });
 });

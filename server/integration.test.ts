@@ -222,6 +222,78 @@ describe("Upload size limit enforcement (multipart field order)", () => {
   }, 30000);
 });
 
+describe("Multipart structural limits", () => {
+  function buildForm(parts: Record<string, string | Blob>): FormData {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(parts)) {
+      if (value instanceof Blob) {
+        form.append(key, new File([value], key === "file" ? "a.png" : `${key}.bin`, { type: "image/png" }));
+      } else {
+        form.append(key, value);
+      }
+    }
+    return form;
+  }
+
+  it("rejects a request with multiple file parts", async () => {
+    const form = buildForm({
+      file: new Blob([TINY_PNG]),
+      second: new Blob([TINY_PNG]),
+      category: "image",
+      targetFormat: "png",
+      options: "{}",
+    });
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
+    expect(res.status).toBe(413);
+  }, 30000);
+
+  it("rejects excessive multipart fields", async () => {
+    const form = buildForm({ file: new Blob([TINY_PNG]), category: "image", targetFormat: "png" });
+    for (let i = 0; i < 20; i++) form.append(`extra${i}`, "x");
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
+    expect(res.status).toBe(413);
+  }, 30000);
+
+  it("rejects excessive multipart parts", async () => {
+    const form = buildForm({ file: new Blob([TINY_PNG]), category: "image", targetFormat: "png" });
+    for (let i = 0; i < 20; i++) form.append(`part${i}`, "x");
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
+    expect(res.status).toBe(413);
+  }, 30000);
+
+  it("cleans up temp files after a structural rejection", async () => {
+    const before = new Set(readdirSync(tmpdir()));
+    const form = buildForm({
+      file: new Blob([TINY_PNG]),
+      second: new Blob([TINY_PNG]),
+      category: "image",
+      targetFormat: "png",
+      options: "{}",
+    });
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
+    expect(res.status).toBe(413);
+    const after = new Set(readdirSync(tmpdir()));
+    const leftover = [...after].filter((f) => f.startsWith("fs-up-") && !before.has(f));
+    expect(leftover).toEqual([]);
+  }, 30000);
+});
+
 describe("Health endpoint", () => {
   it("returns concurrency metrics", async () => {
     const res = await fetch(`${base}/api/health`);

@@ -113,7 +113,7 @@ app.use("/api/code-template", templatesRouter);
 const distDir = path.resolve("dist");
 if (fs.existsSync(path.join(distDir, "index.html"))) {
   app.use(express.static(distDir));
-  app.get("*", (req, res, next) => {
+  app.get("/{*splat}", (req, res, next) => {
     if (req.path.startsWith("/api/")) return next();
     res.sendFile(path.join(distDir, "index.html"));
   });

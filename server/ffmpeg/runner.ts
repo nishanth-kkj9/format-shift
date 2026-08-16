@@ -79,9 +79,14 @@ export function getFFmpegConcurrency(): { max: number; active: number; queued: n
 /**
  * Acquire an ffmpeg slot, or park in the bounded queue. When the queue is full
  * (an abuse or overload signal) the request is rejected instead of growing
- * unbounded. Exported for unit testing.
+ * unbounded. If `signal` aborts while a job is still parked, the job is removed
+ * from the queue and rejected, so cancelled requests never get a slot later.
+ * Exported for unit testing.
  */
-export function acquireFFmpegSlot(): Promise<void> {
+export function acquireFFmpegSlot(signal?: AbortSignal | undefined): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException("Conversion aborted", "AbortError"));
+  }
   if (activeCount < MAX_CONCURRENT_FFMPEG) {
     activeCount++;
     return Promise.resolve();
@@ -89,7 +94,21 @@ export function acquireFFmpegSlot(): Promise<void> {
   if (waiters.length >= MAX_QUEUE) {
     return Promise.reject(new ServerBusyError());
   }
-  return new Promise<void>((resolve) => waiters.push(resolve)).then(() => {
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      const idx = waiters.indexOf(waiter);
+      if (idx !== -1) {
+        waiters.splice(idx, 1);
+        reject(new DOMException("Conversion aborted", "AbortError"));
+      }
+    };
+    const waiter = () => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    waiters.push(waiter);
+  }).then(() => {
     activeCount++;
   });
 }
@@ -134,7 +153,7 @@ export function cleanupTempDir(outPath: string | null): void {
  * A concurrency semaphore caps the number of simultaneous ffmpeg processes.
  */
 export async function runFFmpeg(args: string[], opts: FFmpegRunOptions = {}): Promise<FFmpegResult> {
-  await acquireFFmpegSlot();
+  await acquireFFmpegSlot(opts.signal);
   try {
     return await runFFmpegInner(args, opts);
   } finally {
@@ -145,6 +164,8 @@ export async function runFFmpeg(args: string[], opts: FFmpegRunOptions = {}): Pr
 function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegResult> {
   return new Promise((resolve, reject) => {
     if (!FFMPEG_BIN) return reject(new Error("ffmpeg binary not available"));
+    // Aborted between acquiring the slot and spawning (e.g. while queued).
+    if (opts.signal?.aborted) return reject(new DOMException("Conversion aborted", "AbortError"));
 
     const tempDir = mkdtempSync(join(tmpdir(), "fs-"));
     const outPath = join(tempDir, "output.bin");
