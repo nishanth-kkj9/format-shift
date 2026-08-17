@@ -53,7 +53,16 @@ jobs:
       # tokenless uploads are rejected. The repository owner must add the
       # CODECOV_TOKEN repository secret (Codecov "Configure" tab -> token);
       # the action reads it from the token input below.
+      #
+      # Source-aware policy: repository secrets are NOT available to
+      # fork-originated pull requests, so an authenticated upload would fail for
+      # external contributors even when tests/coverage pass. Run the upload only
+      # for trusted contexts — main-branch pushes and same-repository PRs, where
+      # CODECOV_TOKEN exists — and skip ONLY the upload step for fork PRs (their
+      # tests and coverage still run above). fail_ci_if_error stays true so a
+      # failed upload on a trusted main push still fails the job.
       - name: Upload coverage to Codecov
+        if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) }}
         uses: codecov/codecov-action@v7
         with:
           files: ./coverage/lcov.info

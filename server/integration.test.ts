@@ -115,6 +115,18 @@ describe("POST /api/convert (streaming upload)", () => {
     const leftover = [...after].filter((f) => f.startsWith("fs-up-") && !before.has(f));
     expect(leftover).toEqual([]);
   }, 30000);
+
+  it("returns 413 when ffmpeg output exceeds the output size cap", async () => {
+    const prev = process.env.FFMPEG_MAX_OUTPUT_BYTES;
+    process.env.FFMPEG_MAX_OUTPUT_BYTES = "1";
+    try {
+      const res = await postConvert(new Blob([TINY_PNG]), "cap.png");
+      expect(res.status).toBe(413);
+    } finally {
+      if (prev === undefined) delete process.env.FFMPEG_MAX_OUTPUT_BYTES;
+      else process.env.FFMPEG_MAX_OUTPUT_BYTES = prev;
+    }
+  }, 30000);
 });
 
 describe("Upload size limit enforcement (multipart field order)", () => {
@@ -345,6 +357,21 @@ describe("POST /api/code-template (scoped small body limit)", () => {
     });
     expect(res.status).toBe(400);
   }, 30000);
+});
+
+describe("No global urlencoded body parser", () => {
+  it("does not buffer or reject a >50mb urlencoded request before routing", async () => {
+    const big = new Blob([Buffer.alloc(51 * 1024 * 1024, 0x61)]);
+    const res = await fetch(`${base}/api/health`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: big,
+    });
+    // No global urlencoded parser is mounted, so Express must not buffer or
+    // reject this request with 413. The GET-only /api/health route falls
+    // through to Express's default 404.
+    expect(res.status).toBe(404);
+  }, 60000);
 });
 
 describe("Health endpoint", () => {

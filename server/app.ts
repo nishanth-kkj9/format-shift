@@ -37,11 +37,10 @@ if (env.ENABLE_HSTS) {
 }
 
 // JSON body parsing is scoped per-route: /api/code-template mounts its own
-// small-limit parser, and /api/convert is multipart (busboy). Nothing else
-// consumes JSON, so no global 50mb JSON surface.
-// urlencoded is intentionally left as-is: no route consumes form bodies, and
-// tightening/removing it is out of scope for this finding.
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+// small-limit parser, and /api/convert is multipart (busboy). No route consumes
+// application/x-www-form-urlencoded bodies either (verified across the repo:
+// the only req.body consumer is /api/code-template, which is JSON-only), so
+// there is no global body parser and no 50mb body-buffering surface.
 
 // Standard hardening headers via helmet. CSP must allow the dev server's Vite
 // scripts (served same-origin via proxy) and inline styles used by Tailwind.

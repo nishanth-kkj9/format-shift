@@ -299,6 +299,14 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
         reject(new DOMException("Conversion aborted", "AbortError"));
         return;
       }
+      // The output-limit guard kills the child with SIGKILL, so close() carries
+      // a null exit code here. Decide on the limit flag BEFORE the exit code,
+      // otherwise a limit kill is misreported as a generic ffmpeg failure.
+      if (outputLimitExceeded) {
+        cleanupTempDir(outPath);
+        reject(new OutputLimitError());
+        return;
+      }
       if (code === 0) {
         let size = 0;
         try {
@@ -306,7 +314,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
         } catch {
           // leave 0; route falls back to no Content-Length header
         }
-        if (outputLimitExceeded || size > maxOutputBytes()) {
+        if (size > maxOutputBytes()) {
           cleanupTempDir(outPath);
           reject(new OutputLimitError());
           return;

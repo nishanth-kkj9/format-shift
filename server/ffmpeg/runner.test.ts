@@ -108,4 +108,57 @@ describe("output size limit", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("kills a still-running ffmpeg that outgrows the cap (kill path) and reports OutputLimitError", async () => {
+    // Point the runner's temp dir at a private dir so the leak check below can't
+    // race with temp dirs created by concurrently running test files.
+    const sandbox = mkdtempSync(join(tmpdir(), "fs-killpath-"));
+    const prevTmp = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
+    process.env.TEMP = process.env.TMP = process.env.TMPDIR = sandbox;
+    const input = join(sandbox, "in.png");
+    writeFileSync(input, TINY_PNG);
+    try {
+      await withOutputLimit("1024", async () => {
+        // The endless lavfi sine keeps the child alive, so the 250ms poll
+        // observes the cap being exceeded while the process is still running and
+        // kills it (SIGKILL -> close with a null exit code). Only the fix that
+        // checks outputLimitExceeded before the exit code turns this into an
+        // OutputLimitError instead of a generic "ffmpeg failed (null)".
+        const started = Date.now();
+        await expect(
+          runFFmpeg(
+            [
+              "-f",
+              "lavfi",
+              "-i",
+              "sine=frequency=440",
+              "-map",
+              "1:a",
+              "-c:a",
+              "pcm_s16le",
+              "-f",
+              "wav",
+              "-flush_packets",
+              "1",
+            ],
+            { inputPath: input }
+          )
+        ).rejects.toBeInstanceOf(OutputLimitError);
+        // The infinite source can never finish on its own: a fast rejection
+        // proves the process was terminated by the limit guard, not normal exit.
+        expect(Date.now() - started).toBeLessThan(10_000);
+      });
+      expect(getFFmpegConcurrency().active).toBe(0);
+      // Output temp dir must have been cleaned up (only the input fixture remains).
+      expect(readdirSync(sandbox)).toEqual(["in.png"]);
+    } finally {
+      if (prevTmp.TEMP === undefined) delete process.env.TEMP;
+      else process.env.TEMP = prevTmp.TEMP;
+      if (prevTmp.TMP === undefined) delete process.env.TMP;
+      else process.env.TMP = prevTmp.TMP;
+      if (prevTmp.TMPDIR === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = prevTmp.TMPDIR;
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
