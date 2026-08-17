@@ -21,8 +21,14 @@ ENV FFMPEG_PATH=/usr/bin/ffmpeg
 
 # Runtime deps only. ffmpeg-static is a dev-time fallback; the runtime image
 # resolves ffmpeg via FFMPEG_PATH above.
+# npm is only needed to install deps; the app runs `node dist/server.cjs`
+# directly, so drop the npm CLI and its bundled packages (which carry
+# HIGH/CRITICAL CVEs) from the runtime image. Node and Corepack are separate
+# installs under /usr/local and are untouched.
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev \
+    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build /app/dist ./dist
 
 # Non-root user: run as app instead of root so a compromised process can't

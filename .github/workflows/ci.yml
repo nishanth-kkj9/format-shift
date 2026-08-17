@@ -48,11 +48,17 @@ jobs:
         run: npm install -g npm@$(node -p "require('./package.json').packageManager.split('@')[1]")
       - run: npm ci
       - run: npm test -- --coverage
+      # Public repo, but this is a protected branch (main) upload, and the
+      # Codecov org has token auth required (default for existing orgs), so
+      # tokenless uploads are rejected. The repository owner must add the
+      # CODECOV_TOKEN repository secret (Codecov "Configure" tab -> token);
+      # the action reads it from the token input below.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
           files: ./coverage/lcov.info
           fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   security-audit:
     runs-on: ubuntu-latest
