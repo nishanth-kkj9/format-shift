@@ -258,4 +258,35 @@ describe("parseUploadStream", () => {
       cleanup(up.tempDir, up.filePath);
     }
   });
+
+  it("rejects a file over the global 200MB cap even with no category header", async () => {
+    const big = Buffer.alloc(201 * 1024 * 1024, 0x61);
+    const payload = multipartBody([
+      { name: "targetFormat", value: "txt" },
+      { name: "file", filename: "huge.bin", type: "application/octet-stream", data: big },
+    ]);
+    // Whether busboy's per-file 'limit' event or the streaming global check wins
+    // the race depends on event ordering, so accept either message — both are 413.
+    await expect(parseUploadStream(fakeReq(payload))).rejects.toMatchObject({
+      status: 413,
+      message: /global limit|File too large/,
+    });
+  }, 60000);
+
+  it("rejects a multipart body with no file part", async () => {
+    // A part with no Content-Disposition is skipped by busboy; with no file the
+    // parser has nothing to convert and the request is a client error.
+    const malformed = Buffer.from(
+      `--${BOUNDARY}\r\nContent-Type: text/plain\r\n\r\nhi\r\n--${BOUNDARY}--\r\n`
+    );
+    const pt = new PassThrough();
+    Object.assign(pt, {
+      headers: { host: "localhost", "content-type": CT },
+      url: "/api/convert",
+    });
+    pt.end(malformed);
+    await expect(parseUploadStream(pt as unknown as IncomingMessage)).rejects.toMatchObject({
+      status: 400,
+    });
+  });
 });

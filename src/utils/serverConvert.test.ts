@@ -57,6 +57,26 @@ describe("convertServerSide", () => {
     expect(init.body).toBeInstanceOf(FormData);
   });
 
+  it("strips client-only option keys the server's strict schema rejects", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(new Blob()) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await convertServerSide(file, "audio", "mp3", "wav", {
+      audio: {
+        bitrate: "192k",
+        volume: 100,
+        sampleRate: 44100,
+        channels: 2,
+        spectrumVisualizer: true,
+        spectrumStyle: "bars",
+      },
+    });
+
+    const init = fetchMock.mock.calls[0][1];
+    const options = JSON.parse((init.body as FormData).get("options") as string);
+    expect(options).toEqual({ bitrate: "192k", volume: 100, sampleRate: 44100, channels: 2 });
+  });
+
   it("surfaces server error messages", async () => {
     const fetchMock = vi
       .fn()

@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, History, Download, ArrowRight } from "lucide-react";
 import { ConversionHistoryItem } from "../types";
 import { formatBytes } from "../utils/converter";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface HistoryDrawerProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ interface HistoryDrawerProps {
 }
 
 export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose, history, onClearHistory }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(isOpen, dialogRef, onClose);
+
   const totalSavedBytes = history.reduce((acc, h) => acc + Math.max(0, h.originalSize - h.convertedSize), 0);
 
   return (
@@ -29,6 +33,11 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose, h
 
           {/* Drawer Body */}
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-title"
+            tabIndex={-1}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -39,7 +48,9 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose, h
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-900/80">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">Conversion History</h3>
+                <h3 id="history-title" className="text-base font-bold text-white">
+                  Conversion History
+                </h3>
               </div>
               <button
                 onClick={onClose}

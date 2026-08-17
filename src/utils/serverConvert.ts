@@ -3,6 +3,42 @@ import { FileCategory, needsServerEngine, planConversion } from "../core/convers
 
 export { needsServerEngine };
 
+/**
+ * Option keys the ffmpeg backend understands (mirrors OPTIONS_SCHEMA in
+ * server/convert.ts). Client-only keys (maintainAspectRatio, bgColor, flips,
+ * socialPreset, spectrum*...) would otherwise trip the server's strict schema
+ * and fail every server-engine conversion.
+ */
+const SERVER_OPTION_KEYS = new Set([
+  "quality",
+  "grayscale",
+  "rotation",
+  "maxWidth",
+  "maxHeight",
+  "bitrate",
+  "sampleRate",
+  "channels",
+  "volume",
+  "trimStart",
+  "trimEnd",
+  "resolution",
+  "fps",
+  "muteAudio",
+]);
+
+function serverOptions(
+  options: ConversionOptions,
+  categoryKey: keyof ConversionOptions
+): Record<string, unknown> {
+  const source = (options[categoryKey] || {}) as Record<string, unknown>;
+  const filtered: Record<string, unknown> = {};
+  for (const key of SERVER_OPTION_KEYS) {
+    const value = source[key];
+    if (value !== undefined) filtered[key] = value;
+  }
+  return filtered;
+}
+
 /** Client-side router: should this category+target go to the ffmpeg backend? */
 export function needsServerConversion(category: string, targetFormat: string): boolean {
   return needsServerEngine(category as FileCategory, targetFormat);
@@ -30,7 +66,7 @@ export async function convertServerSide(
   form.append("sourceFormat", sourceFormat);
   form.append("targetFormat", targetFormat);
   const categoryKey = category as keyof ConversionOptions;
-  form.append("options", JSON.stringify(options[categoryKey] || {}));
+  form.append("options", JSON.stringify(serverOptions(options, categoryKey)));
 
   // Send category in header so server can enforce category-specific limits during streaming
   const res = await fetch(`/api/convert?category=${encodeURIComponent(category)}`, {

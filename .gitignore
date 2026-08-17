@@ -10,6 +10,8 @@ plans/
 probe/out*/
 probe/audio/
 test-results/
+playwright-report/
+blob-report/
 test-1s.mp4
 test-1s.png
 test-2s.wav

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Eye, Download, ArrowRight, Music, Film, FileCode } from "lucide-react";
 import { ConversionItem } from "../types";
 import { formatBytes } from "../utils/converter";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface PreviewModalProps {
   item: ConversionItem | null;
@@ -12,6 +13,9 @@ interface PreviewModalProps {
 }
 
 export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClose, onDownload }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(isOpen, dialogRef, onClose);
+
   const [sliderPos, setSliderPos] = useState(50);
   const [convertedText, setConvertedText] = useState<string>("");
 
@@ -66,6 +70,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
 
           {/* Modal Container */}
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="preview-title"
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
@@ -79,7 +88,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
                   <Eye className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <h3 id="preview-title" className="text-sm font-black text-white flex items-center gap-2">
                     <span className="truncate max-w-[200px]">{item.name}</span>
                     <ArrowRight className="w-4 h-4 text-slate-400" />
                     <span className="text-indigo-400 font-black uppercase">{item.targetFormat}</span>
@@ -162,6 +171,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
                       max="100"
                       value={sliderPos}
                       onChange={(e) => setSliderPos(parseInt(e.target.value))}
+                      aria-label="Compare original and converted image"
                       className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30"
                     />
 

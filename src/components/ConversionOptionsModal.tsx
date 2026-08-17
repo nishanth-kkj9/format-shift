@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 import {
   X,
   RotateCw,
@@ -36,6 +37,9 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
   onClose,
   onSaveOptions,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(isOpen, dialogRef, onClose);
+
   const [imageOpts, setImageOpts] = useState<ImageConversionOptions>(
     item.options.image || {
       quality: 85,
@@ -103,6 +107,11 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
 
           {/* Modal Container */}
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conversion-options-title"
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
@@ -116,7 +125,10 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   <Sliders className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <h3
+                    id="conversion-options-title"
+                    className="text-sm font-black text-white flex items-center gap-2"
+                  >
                     <span>Format Fine-Tuning</span>
                   </h3>
                   <p className="text-xs text-indigo-300 font-medium truncate max-w-[240px]">{item.name}</p>
@@ -435,11 +447,11 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                     <label className="text-xs font-bold text-slate-200 block">Target Audio Bitrate</label>
                     <div className="grid grid-cols-4 gap-2">
-                      {["128k", "192k", "256k", "320k"].map((b) => (
+                      {(["128k", "192k", "256k", "320k"] as const).map((b) => (
                         <button
                           key={b}
                           type="button"
-                          onClick={() => setAudioOpts({ ...audioOpts, bitrate: b as any })}
+                          onClick={() => setAudioOpts({ ...audioOpts, bitrate: b })}
                           className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             audioOpts.bitrate === b
                               ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
@@ -486,16 +498,18 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                     <label className="text-xs font-bold text-slate-200 block">Target Resolution</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { label: "Original", val: "original" },
-                        { label: "1080p Full HD", val: "1080p" },
-                        { label: "720p HD", val: "720p" },
-                        { label: "480p SD", val: "480p" },
-                      ].map((r) => (
+                      {(
+                        [
+                          { label: "Original", val: "original" },
+                          { label: "1080p Full HD", val: "1080p" },
+                          { label: "720p HD", val: "720p" },
+                          { label: "480p SD", val: "480p" },
+                        ] as const
+                      ).map((r) => (
                         <button
                           key={r.val}
                           type="button"
-                          onClick={() => setVideoOpts({ ...videoOpts, resolution: r.val as any })}
+                          onClick={() => setVideoOpts({ ...videoOpts, resolution: r.val })}
                           className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             videoOpts.resolution === r.val
                               ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
@@ -511,11 +525,11 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                     <label className="text-xs font-bold text-slate-200 block">Target Frame Rate (FPS)</label>
                     <div className="grid grid-cols-3 gap-2">
-                      {[24, 30, 60].map((fps) => (
+                      {([24, 30, 60] as const).map((fps) => (
                         <button
                           key={fps}
                           type="button"
-                          onClick={() => setVideoOpts({ ...videoOpts, fps: fps as any })}
+                          onClick={() => setVideoOpts({ ...videoOpts, fps: fps })}
                           className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                             videoOpts.fps === fps
                               ? "bg-indigo-600 text-white border-indigo-400 shadow-md"

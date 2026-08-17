@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { createReadStream } from "node:fs";
 import { parseUploadStream, cleanup, UploadError } from "../upload";
 import {
@@ -26,6 +26,12 @@ function logError(context: Record<string, unknown>): void {
 }
 
 export const convertRouter = Router();
+
+// Structured error payload: stable error message + requestId so clients can
+// correlate failures across retries and server-side logs.
+function errorResponse(res: Response, status: number, message: string, requestId: string): void {
+  res.status(status).json({ error: message, requestId });
+}
 
 // Actual file conversion via local ffmpeg. Multipart: file + category + sourceFormat + targetFormat + options(JSON string)
 convertRouter.post("/", async (req, res) => {
@@ -84,7 +90,7 @@ convertRouter.post("/", async (req, res) => {
     if (!result) throw new Error("No conversion result produced");
     if (controller.signal.aborted) {
       result.cleanup();
-      return res.status(499).json({ error: "Client closed the connection" });
+      return errorResponse(res, 499, "Client closed the connection", requestId);
     }
 
     res.setHeader("Content-Type", mime);
@@ -105,7 +111,7 @@ convertRouter.post("/", async (req, res) => {
     stream.on("close", () => result.cleanup());
     stream.on("error", () => {
       result.cleanup();
-      if (!res.headersSent) res.status(500).json({ error: "Failed to stream conversion output" });
+      if (!res.headersSent) errorResponse(res, 500, "Failed to stream conversion output", requestId);
       res.end();
     });
     return;
@@ -140,20 +146,20 @@ convertRouter.post("/", async (req, res) => {
     });
 
     if (err instanceof UploadError) {
-      return res.status(err.status).json({ error: message });
+      return errorResponse(res, err.status, message, requestId);
     }
     if (err instanceof ServerBusyError) {
-      return res.status(503).json({ error: message });
+      return errorResponse(res, 503, message, requestId);
     }
     if (err instanceof OutputLimitError) {
-      return res.status(413).json({ error: message });
+      return errorResponse(res, 413, message, requestId);
     }
     const isClientError =
       err instanceof UnsupportedFormatError ||
       err instanceof UnsupportedConversionError ||
       err instanceof NoAudioStreamError ||
       err instanceof InvalidOptionError;
-    return res.status(isClientError ? 400 : 500).json({ error: message });
+    return errorResponse(res, isClientError ? 400 : 500, message, requestId);
   } finally {
     if (upload) cleanup(upload.tempDir, upload.filePath);
   }

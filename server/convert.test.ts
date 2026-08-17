@@ -198,6 +198,12 @@ describe("validateOptions", () => {
     );
   });
 
+  it("accepts valid trimStart/trimEnd", () => {
+    expect(() =>
+      validateOptions({ targetFormat: "mp3", category: "audio", trimStart: 0.5, trimEnd: 120 })
+    ).not.toThrow();
+  });
+
   it("rejects invalid resolution", () => {
     expect(() => validateOptions({ targetFormat: "mp4", category: "video", resolution: "2k" })).toThrow(
       InvalidOptionError

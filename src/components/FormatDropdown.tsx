@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useId } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Image } from "lucide-react";
 import { FileCategory, TargetFormat } from "../types";
 import { CONVERSION_REGISTRY, getAvailableTargets } from "../core/conversionRegistry";
 import { FORMAT_META } from "./formatMeta";
@@ -49,6 +49,7 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPos, setMenuPos] = useState<{
     top: number;
     left: number;
@@ -58,12 +59,77 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
   const options = availableFormats
     ? FORMAT_OPTIONS[category].filter((o) => availableFormats.includes(o.format))
     : FORMAT_OPTIONS[category] || FORMAT_OPTIONS.image;
   const selectedOption = options.find((o) => o.format === value) || options[0];
   const SelectedIcon = selectedOption.icon;
+  const activeOption = isOpen && activeIndex >= 0 ? options[activeIndex] : undefined;
+
+  const openMenu = (initialIndex: number) => {
+    const idx = initialIndex >= 0 && initialIndex < options.length ? initialIndex : 0;
+    setActiveIndex(idx);
+    setIsOpen(true);
+  };
+
+  const closeMenu = () => {
+    setIsOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (isOpen) {
+          setActiveIndex((i) => (i >= options.length - 1 ? 0 : i + 1));
+        } else {
+          const cur = options.findIndex((o) => o.format === value);
+          openMenu(cur >= 0 ? cur : 0);
+        }
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (isOpen) {
+          setActiveIndex((i) => (i <= 0 ? options.length - 1 : i - 1));
+        } else {
+          const cur = options.findIndex((o) => o.format === value);
+          openMenu(cur >= 0 ? cur : options.length - 1);
+        }
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        if (isOpen) {
+          const active = options[activeIndex];
+          if (active) {
+            onChange(active.format);
+            closeMenu();
+          }
+        } else {
+          openMenu(0);
+        }
+        break;
+      case "Escape":
+        if (isOpen) {
+          e.preventDefault();
+          closeMenu();
+        }
+        break;
+    }
+  };
+
+  // Scroll the highlighted option into view when navigating with the keyboard.
+  // `?.` guards jsdom, where scrollIntoView is not implemented.
+  useEffect(() => {
+    if (!activeOption) return;
+    document.getElementById(`${menuId}-${activeOption.format}`)?.scrollIntoView?.({
+      block: "nearest",
+    });
+  }, [activeOption, menuId]);
 
   // Close on outside click - checks both the trigger and the portaled menu
   useEffect(() => {
@@ -122,8 +188,17 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
         ref={triggerRef}
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
-        className="px-3.5 py-1.5 rounded-xl text-xs font-bold glass-input text-white border border-white/15 hover:border-indigo-400/50 hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md group"
+        onClick={() => (isOpen ? closeMenu() : openMenu(0))}
+        onKeyDown={handleTriggerKeyDown}
+        onBlur={() => {
+          if (isOpen) closeMenu();
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={menuId}
+        aria-activedescendant={activeOption ? `${menuId}-${activeOption.format}` : undefined}
+        aria-label={`Choose output format, currently ${value}`}
+        className="px-3.5 py-1.5 rounded-xl text-xs font-bold glass-input text-white border border-white/15 hover:border-indigo-400/50 hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
       >
         <div className="w-5 h-5 rounded-md bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
           <SelectedIcon className="w-3.5 h-3.5" />
@@ -145,6 +220,9 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
         createPortal(
           <div
             ref={menuRef}
+            role="listbox"
+            id={menuId}
+            aria-label={`Output formats for ${category}`}
             style={{
               position: "fixed",
               top: menuPos.openUp ? undefined : menuPos.top,
@@ -159,19 +237,23 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
               <span className="text-indigo-400 font-mono">{category.toUpperCase()}</span>
             </div>
 
-            {options.map((opt) => {
+            {options.map((opt, index) => {
               const Icon = opt.icon;
               const isSelected = opt.format === value;
 
               return (
-                <button
+                <div
                   key={opt.format}
-                  type="button"
+                  id={`${menuId}-${opt.format}`}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     onChange(opt.format);
-                    setIsOpen(false);
+                    closeMenu();
                   }}
-                  className={`w-full px-2.5 py-2 rounded-xl text-left transition-all flex items-center justify-between group ${
+                  className={`w-full px-2.5 py-2 rounded-xl text-left transition-all flex items-center justify-between cursor-pointer ${
+                    activeIndex === index ? "ring-1 ring-indigo-400" : ""
+                  } ${
                     isSelected
                       ? "bg-indigo-500/20 text-white border border-indigo-400/40 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                       : "text-slate-300 hover:bg-white/10 hover:text-white"
@@ -220,7 +302,7 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
                     </span>
                     {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400" />}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>,

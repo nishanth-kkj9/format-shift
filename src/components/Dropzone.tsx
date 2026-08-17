@@ -53,6 +53,14 @@ export const Dropzone: React.FC<DropzoneProps> = ({
     onFilesAdded([sample]);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
+  };
+
   return (
     <div className="w-full">
       <input type="file" ref={fileInputRef} onChange={handleFileInput} multiple className="hidden" />
@@ -63,11 +71,15 @@ export const Dropzone: React.FC<DropzoneProps> = ({
         whileTap={{ scale: 0.99 }}
         animate={{ scale: isDragOver ? 1.03 : 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        role="button"
+        tabIndex={0}
+        aria-label="Choose files to convert. Press Enter or Space to browse."
+        onKeyDown={handleKeyDown}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`relative cursor-pointer rounded-3xl border-2 border-dashed transition-colors duration-300 p-8 sm:p-12 text-center group overflow-hidden ${
+        className={`relative cursor-pointer rounded-3xl border-2 border-dashed transition-colors duration-300 p-8 sm:p-12 text-center group overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
           isDragOver
             ? "border-indigo-400 bg-indigo-500/20 shadow-[0_0_40px_rgba(99,102,241,0.4)]"
             : "border-white/20 glass-card hover:border-indigo-400/60 hover:bg-white/10 shadow-xl"

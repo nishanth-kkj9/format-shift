@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Code2, Copy, Check } from "lucide-react";
 import { CodeTemplateResponse, FileCategory } from "../types";
 import { CONVERSION_REGISTRY, getAvailableTargets } from "../core/conversionRegistry";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface CodeSnippetModalProps {
   isOpen: boolean;
@@ -19,6 +20,9 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   sourceFormat = "png",
   targetFormat = "jpg",
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(isOpen, dialogRef, onClose);
+
   const [activeTab, setActiveTab] = useState<"python" | "node" | "html">("python");
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -91,6 +95,11 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
 
           {/* Modal Container */}
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="code-snippet-title"
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
@@ -104,7 +113,9 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                   <Code2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">Developer API & Code Snippets</h3>
+                  <h3 id="code-snippet-title" className="text-sm font-black text-white">
+                    Developer API & Code Snippets
+                  </h3>
                   <p className="text-xs text-slate-400">
                     Programmatic <span className="font-bold text-indigo-400 uppercase">{sourceFormat}</span> →{" "}
                     <span className="font-bold text-indigo-400 uppercase">{targetFormat}</span> conversion

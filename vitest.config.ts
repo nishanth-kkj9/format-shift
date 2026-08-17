@@ -6,13 +6,18 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      // The checklist targets the pure-logic conversion/metadata modules, not
-      // the visualizer engine (hand-tuned) or React components. Gate those files.
+      // The checklist targets the pure-logic conversion/metadata modules and the
+      // server critical path, not the visualizer engine (hand-tuned) or React
+      // components. Gate those files.
       include: [
         "src/utils/detect.ts",
         "src/utils/metadata.ts",
         "src/utils/serverConvert.ts",
         "src/core/conversionRegistry.ts",
+        "server/upload.ts",
+        "server/convert.ts",
+        "server/ffmpeg/runner.ts",
+        "server/routes/convert.ts",
       ],
       thresholds: {
         perFile: true,

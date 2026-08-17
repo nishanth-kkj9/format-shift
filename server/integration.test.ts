@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { FFMPEG_BIN } from "./ffmpeg/runner";
+import { FFMPEG_BIN, acquireFFmpegSlot, releaseFFmpegSlot, getFFmpegConcurrency } from "./ffmpeg/runner";
 
 // 1x1 transparent PNG — has real PNG magic bytes (\x89PNG\r\n\x1a\n)
 const TINY_PNG = Buffer.from(
@@ -125,6 +125,67 @@ describe("POST /api/convert (streaming upload)", () => {
     } finally {
       if (prev === undefined) delete process.env.FFMPEG_MAX_OUTPUT_BYTES;
       else process.env.FFMPEG_MAX_OUTPUT_BYTES = prev;
+    }
+  }, 30000);
+});
+
+describe("POST /api/convert (error paths + requestId)", () => {
+  it("rejects an unsupported target with 400 and a requestId", async () => {
+    const res = await postConvert(new Blob([TINY_PNG]), "test.png", "image", "pdf");
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Conversion not supported/);
+    expect(typeof body.requestId).toBe("string");
+  }, 30000);
+
+  it("rejects a source format the category does not accept (yaml -> data)", async () => {
+    const form = new FormData();
+    // text/yaml has no magic bytes; sourceFormat resolves to "yaml", which the
+    // data category registry does not list as a source.
+    form.append("file", new File([Buffer.from("a: 1\nb: 2\n")], "data.yaml", { type: "text/yaml" }));
+    form.append("category", "data");
+    form.append("targetFormat", "json");
+    form.append("options", "{}");
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "data" },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(typeof body.requestId).toBe("string");
+  }, 30000);
+
+  it("rejects unknown option keys with 400 (no ffmpeg arg smuggling)", async () => {
+    const form = new FormData();
+    form.append("file", new File([TINY_PNG], "img.png", { type: "image/png" }));
+    form.append("category", "image");
+    form.append("targetFormat", "png");
+    form.append("options", JSON.stringify({ "-map": "evil" }));
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid option/);
+    expect(typeof body.requestId).toBe("string");
+  }, 30000);
+
+  it("returns 503 with a requestId when the ffmpeg queue is saturated", async () => {
+    const { max } = getFFmpegConcurrency();
+    const queueCap = max * 5;
+    for (let i = 0; i < max; i++) await acquireFFmpegSlot();
+    for (let i = 0; i < queueCap; i++) void acquireFFmpegSlot();
+    try {
+      const res = await postConvert(new Blob([TINY_PNG]), "busy.png");
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body.error).toMatch(/busy/i);
+      expect(typeof body.requestId).toBe("string");
+    } finally {
+      for (let i = 0; i < max + queueCap; i++) releaseFFmpegSlot();
     }
   }, 30000);
 });

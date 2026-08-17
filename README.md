@@ -11,7 +11,7 @@ A browser-first conversion app built with React and TypeScript. FormatShift conv
 ![CI](https://img.shields.io/github/actions/workflow/status/nishanth-kkj9/format-shift/ci.yml?branch=main&label=CI)
 ![Coverage](https://img.shields.io/codecov/c/github/nishanth-kkj9/format-shift)
 ![License](https://img.shields.io/github/license/nishanth-kkj9/format-shift)
-![Node](https://img.shields.io/badge/node-%3E%3D20-green)
+![Node](https://img.shields.io/badge/node-%3E%3D22-green)
 
 </div>
 
@@ -84,7 +84,7 @@ This approach reduces unnecessary uploads while still supporting media formats t
 - Markdown/text → HTML conversion.
 - Plain-text, Markdown and HTML document targets (all browser-side).
 
-> **Current implementation note:** data/document conversion is text-based and browser-side. There is no full PDF rendering engine, so PDF is accepted as an _input_ source but is **not** offered as an output target — asking for a PDF target returns an explicit "unsupported" error rather than a fake file.
+> **Current implementation note:** data/document conversion is text-based and browser-side. There is no PDF rendering or generation engine, so PDF is **not** supported as an input _or_ output — asking for a PDF target returns an explicit "unsupported" error rather than a fake file.
 
 ### UX
 
@@ -156,13 +156,13 @@ The upload layer also performs category-specific size checks and best-effort mag
 
 All targets below are defined once in `src/core/conversionRegistry.ts`; the UI, detection, server endpoint and code templates all derive from it. No conversion is advertised that the app cannot genuinely perform.
 
-| Category     | Targets                                                      | Browser engine                              | Server (FFmpeg) engine                               |
-| ------------ | ------------------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------- |
-| **Image**    | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF               | JPG, JPEG, PNG, WEBP, SVG                   | GIF, BMP, ICO, AVIF (and any browser target via API) |
-| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC, MP4, WEBM                     | WAV, MP4/WEBM (spectrum visualizer)         | MP3, OGG, AAC, M4A, FLAC                             |
-| **Video**    | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server)                              | All                                                  |
-| **Data**     | JSON, CSV, TSV, XML, YAML                                    | All                                         | —                                                    |
-| **Document** | TXT, MD, HTML                                                | All (PDF/TXT/MD/HTML accepted as _sources_) | —                                                    |
+| Category     | Targets                                                      | Browser engine                          | Server (FFmpeg) engine                               |
+| ------------ | ------------------------------------------------------------ | --------------------------------------- | ---------------------------------------------------- |
+| **Image**    | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF               | JPG, JPEG, PNG, WEBP, SVG               | GIF, BMP, ICO, AVIF (and any browser target via API) |
+| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC, MP4, WEBM                     | WAV, MP4/WEBM (spectrum visualizer)     | MP3, OGG, AAC, M4A, FLAC                             |
+| **Video**    | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server)                          | All                                                  |
+| **Data**     | JSON, CSV, TSV, XML, YAML                                    | All                                     | —                                                    |
+| **Document** | TXT, MD, HTML                                                | All (TXT/MD/HTML accepted as _sources_) | —                                                    |
 
 ### Server upload limits
 
@@ -194,7 +194,7 @@ The multipart parser also has an overall 200 MB Busboy file-size limit.
 
 ### Backend
 
-- Node.js 20+
+- Node.js 22+
 - Express 5
 - TypeScript
 - `tsx`
@@ -218,7 +218,7 @@ The multipart parser also has an overall 200 MB Busboy file-size limit.
 
 ### Prerequisites
 
-- **Node.js 20 or newer**
+- **Node.js 22 or newer**
 - npm
 - A modern browser with Canvas/Web Audio/media API support
 
@@ -483,7 +483,7 @@ FormatShift is a file-processing application, so a public deployment should stil
 - Browser `canvas.toBlob()` encoders that are unavailable now surface a clear error (and the image may be retried on the server API) rather than silently returning a PNG.
 - Large client-side media conversions can consume significant browser memory.
 - Server-side FFmpeg conversions consume CPU and temporary disk space.
-- The document pipeline is text-based, not a full office/PDF conversion engine; PDF is accepted as an input but never advertised as an output.
+- The document pipeline is text-based, not a full office/PDF conversion engine; PDF is rejected as an input and never advertised as an output.
 - Conversion options are category-specific and not every UI option applies to every output format.
 - Code templates are illustrative snippets, not a guarantee that every generated snippet supports every FormatShift option.
 
