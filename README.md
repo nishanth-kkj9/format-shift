@@ -396,7 +396,7 @@ Then open:
 http://localhost:4000
 ```
 
-The production image uses Node 20 Alpine and installs runtime dependencies separately from development dependencies.
+The production image uses Node 22 slim and installs runtime dependencies separately from development dependencies.
 
 ---
 
