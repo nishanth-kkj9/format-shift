@@ -26,6 +26,12 @@ describe("assertSupportedConversion", () => {
   it("accepts supported conversions", () => {
     expect(() => assertSupportedConversion("audio", "mp3")).not.toThrow();
   });
+
+  it("rejects conversions excluded for the specific source format", () => {
+    expect(() => assertSupportedConversion("document", "md", "html")).toThrow();
+    expect(() => assertSupportedConversion("document", "md", "htm")).toThrow();
+    expect(() => assertSupportedConversion("document", "md", "txt")).not.toThrow();
+  });
 });
 
 describe("convertServerSide", () => {

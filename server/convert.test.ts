@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { imageArgs, imageFilters } from "./ffmpeg/filters";
 import { videoArgs } from "./ffmpeg/video";
 import { runFFmpeg } from "./ffmpeg/runner";
-import { validateOptions, InvalidOptionError } from "./convert";
+import { validateOptions, InvalidOptionError, OPTIONS_SCHEMA } from "./convert";
+import { SERVER_OPTION_KEYS } from "../src/core/conversionRegistry";
 import {
   acquireFFmpegSlot,
   releaseFFmpegSlot,
@@ -280,6 +281,10 @@ describe("validateOptions", () => {
     expect(() => validateOptions({ targetFormat: "jpg", category: "image", maxHeight: 10001 })).toThrow(
       InvalidOptionError
     );
+  });
+
+  it("stays in sync with the shared SERVER_OPTION_KEYS contract", () => {
+    expect(Object.keys(OPTIONS_SCHEMA.shape).sort()).toEqual([...SERVER_OPTION_KEYS].sort());
   });
 });
 

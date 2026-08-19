@@ -1,30 +1,12 @@
 import { ConversionOptions } from "../types";
-import { FileCategory, needsServerEngine, planConversion } from "../core/conversionRegistry";
+import {
+  FileCategory,
+  needsServerEngine,
+  planConversion,
+  SERVER_OPTION_KEYS,
+} from "../core/conversionRegistry";
 
 export { needsServerEngine };
-
-/**
- * Option keys the ffmpeg backend understands (mirrors OPTIONS_SCHEMA in
- * server/convert.ts). Client-only keys (maintainAspectRatio, bgColor, flips,
- * socialPreset, spectrum*...) would otherwise trip the server's strict schema
- * and fail every server-engine conversion.
- */
-const SERVER_OPTION_KEYS = new Set([
-  "quality",
-  "grayscale",
-  "rotation",
-  "maxWidth",
-  "maxHeight",
-  "bitrate",
-  "sampleRate",
-  "channels",
-  "volume",
-  "trimStart",
-  "trimEnd",
-  "resolution",
-  "fps",
-  "muteAudio",
-]);
 
 function serverOptions(
   options: ConversionOptions,
@@ -45,8 +27,12 @@ export function needsServerConversion(category: string, targetFormat: string): b
 }
 
 /** Validate a conversion plan up front so we never hit the network for fake ops. */
-export function assertSupportedConversion(category: string, targetFormat: string): void {
-  const plan = planConversion(category as FileCategory, targetFormat);
+export function assertSupportedConversion(
+  category: string,
+  targetFormat: string,
+  sourceFormat?: string
+): void {
+  const plan = planConversion(category as FileCategory, targetFormat, sourceFormat);
   if (plan.supported === false) throw new Error(plan.reason);
 }
 
@@ -58,7 +44,7 @@ export async function convertServerSide(
   options: ConversionOptions,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
-  assertSupportedConversion(category, targetFormat);
+  assertSupportedConversion(category, targetFormat, sourceFormat);
 
   const form = new FormData();
   form.append("file", file);

@@ -151,6 +151,23 @@ describe("POST /api/convert (error paths + requestId)", () => {
     expect(typeof body.requestId).toBe("string");
   }, 30000);
 
+  it("rejects HTML -> Markdown even though the target exists in the registry (source exclusion)", async () => {
+    const form = new FormData();
+    form.append("file", new File([Buffer.from("<h1>Hi</h1>")], "page.html", { type: "text/html" }));
+    form.append("category", "document");
+    form.append("targetFormat", "md");
+    form.append("options", "{}");
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "document" },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Conversion not supported/);
+    expect(typeof body.requestId).toBe("string");
+  }, 30000);
+
   it("rejects unknown option keys with 400 (no ffmpeg arg smuggling)", async () => {
     const form = new FormData();
     form.append("file", new File([TINY_PNG], "img.png", { type: "image/png" }));
@@ -480,6 +497,7 @@ describe("Server-side source conversions (source-format validation)", () => {
   let toneMp3: Buffer;
   let toneWav: Buffer;
   let toneMp4: Buffer;
+  let toneWebm: Buffer;
 
   beforeAll(() => {
     fixtureDir = mkdtempSync(join(tmpdir(), "fs-fix-"));
@@ -520,9 +538,19 @@ describe("Server-side source conversions (source-format validation)", () => {
       "-shortest",
       join(fixtureDir, "tone.mp4"),
     ]);
+    run([
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=0.2",
+      "-c:a",
+      "libopus",
+      join(fixtureDir, "tone.webm"),
+    ]);
     toneMp3 = readFileSync(join(fixtureDir, "tone.mp3"));
     toneWav = readFileSync(join(fixtureDir, "tone.wav"));
     toneMp4 = readFileSync(join(fixtureDir, "tone.mp4"));
+    toneWebm = readFileSync(join(fixtureDir, "tone.webm"));
   });
 
   afterAll(() => {
@@ -553,6 +581,15 @@ describe("Server-side source conversions (source-format validation)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("audio/mpeg");
     expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);
+  }, 30000);
+
+  it("converts audio-only webm -> wav (webm source normalized to weba)", async () => {
+    const res = await postAudio(toneWebm, "tone.webm", "audio/webm", "wav");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("audio/wav");
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.subarray(0, 4).toString("ascii")).toBe("RIFF");
+    expect(buf.subarray(8, 12).toString("ascii")).toBe("WAVE");
   }, 30000);
 
   it("rejects audio -> mp4/webm (visualizer targets run client-side)", async () => {

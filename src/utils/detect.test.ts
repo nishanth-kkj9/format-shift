@@ -23,6 +23,12 @@ describe("detectCategoryAndFormats", () => {
     expect(r.category).toBe("audio");
   });
 
+  it("normalizes audio webm to the weba source format", () => {
+    const r = detectCategoryAndFormats(fakeFile("clip.webm", "audio/webm"));
+    expect(r.category).toBe("audio");
+    expect(r.sourceFormat).toBe("weba");
+  });
+
   it("detects video by mime type", () => {
     const r = detectCategoryAndFormats(fakeFile("clip.mp4", "video/mp4"));
     expect(r.category).toBe("video");

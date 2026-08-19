@@ -41,28 +41,30 @@ export async function convertDataDocument(
       } else {
         resultText = JSON.stringify(parsed, null, options?.indentSpaces || 2);
       }
-    } else if (/^[^"']*[,\t]/.test(text.trim())) {
-      sourceIsData = true;
-      const sep = file.name.endsWith(".tsv") || file.name.endsWith(".tab") ? "\t" : ",";
-      const parsedJson = csvToJson(text, sep);
-      if (tgt === "json") {
-        resultText = JSON.stringify(parsedJson, null, options?.indentSpaces || 2);
-      } else if (tgt === "xml") {
-        resultText = jsonToXml({ record: parsedJson });
-      } else if (tgt === "yaml") {
-        resultText = jsonToYaml(parsedJson);
-      } else if (tgt === "tsv") {
-        resultText = jsonToCsv(parsedJson, "\t");
-      } else {
-        resultText = text;
-      }
     } else {
-      if (tgt === "html") {
-        resultText = markdownToHtml(text);
-      } else if (tgt === "json") {
-        resultText = JSON.stringify({ content: text, lines: text.split("\n") }, null, 2);
+      const sep = tabularSeparator(text, file.name);
+      if (sep) {
+        sourceIsData = true;
+        const parsedJson = csvToJson(text, sep);
+        if (tgt === "json") {
+          resultText = JSON.stringify(parsedJson, null, options?.indentSpaces || 2);
+        } else if (tgt === "xml") {
+          resultText = jsonToXml({ record: parsedJson });
+        } else if (tgt === "yaml") {
+          resultText = jsonToYaml(parsedJson);
+        } else if (tgt === "tsv") {
+          resultText = jsonToCsv(parsedJson, "\t");
+        } else {
+          resultText = text;
+        }
       } else {
-        resultText = text;
+        if (tgt === "html") {
+          resultText = markdownToHtml(text);
+        } else if (tgt === "json") {
+          resultText = JSON.stringify({ content: text, lines: text.split("\n") }, null, 2);
+        } else {
+          resultText = text;
+        }
       }
     }
   } catch (err) {
@@ -90,16 +92,43 @@ function isJson(str: string): boolean {
   }
 }
 
+/**
+ * Decide whether a document/data file is genuinely tabular (CSV/TSV), returning
+ * the delimiter when it is. A .csv/.tsv/.tab extension is authoritative;
+ * otherwise require strong evidence (quoted first field, 2+ columns in the
+ * first row, or a delimiter spread across multiple lines) so prose like
+ * "Hello, world" is never misread as a data file.
+ */
+function tabularSeparator(text: string, name: string): string | null {
+  const nameLower = name.toLowerCase();
+  const sep =
+    nameLower.endsWith(".tsv") || nameLower.endsWith(".tab") || (text.includes("\t") && !text.includes(","))
+      ? "\t"
+      : ",";
+  if (nameLower.endsWith(".csv") || nameLower.endsWith(".tsv") || nameLower.endsWith(".tab")) return sep;
+  const lines = text.split("\n").filter((l) => l.trim() !== "");
+  const firstLine = lines[0] ?? "";
+  const delimCount = (firstLine.match(sep === "\t" ? /\t/g : /,/g) ?? []).length;
+  const tabular =
+    /^\s*"/.test(firstLine) ||
+    delimCount >= 2 ||
+    (delimCount >= 1 && lines.length >= 2 && lines.slice(1).some((l) => l.includes(sep)));
+  return tabular ? sep : null;
+}
+
 function parseCsv(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let fields: string[] = [];
   let current = "";
   let inQuotes = false;
+  let quoted = false;
   let i = 0;
   const src = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const endField = () => {
-    fields.push(current.trim());
+    // Quoted fields keep their whitespace verbatim; unquoted fields are trimmed.
+    fields.push(quoted ? current : current.trim());
     current = "";
+    quoted = false;
   };
   const endRecord = () => {
     endField();
@@ -122,6 +151,7 @@ function parseCsv(text: string, delimiter: string): string[][] {
     } else {
       if (char === '"') {
         inQuotes = true;
+        quoted = true;
       } else if (char === delimiter) {
         endField();
       } else if (char === "\n") {
@@ -149,8 +179,9 @@ export function jsonToCsv(json: unknown, delimiter = ","): string {
         if (val === null || val === undefined) return "";
         const strVal = typeof val === "object" ? JSON.stringify(val) : String(val);
         // Spreadsheet formula injection guard: prefix cells that start with
-        // =,+,-,@ (OWASP CSV injection) so Excel/sheets treat them as text.
-        const guarded = /^[=+\-@]/.test(strVal) && !strVal.startsWith('"') ? "'" + strVal : strVal;
+        // =,+,-,@ plus tab/CR prefixes (OWASP CSV injection) so Excel/sheets
+        // treat them as text.
+        const guarded = /^[=+\-@\t\r]/.test(strVal) && !strVal.startsWith('"') ? "'" + strVal : strVal;
         return guarded.includes(delimiter) || guarded.includes("\n") || guarded.includes('"')
           ? `"${guarded.replace(/"/g, '""')}"`
           : guarded;

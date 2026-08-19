@@ -57,7 +57,7 @@ convertRouter.post("/", async (req, res) => {
     }
 
     const targetFormat = upload.targetFormat.toLowerCase();
-    const plan = planConversion(registryCategory, targetFormat);
+    const plan = planConversion(registryCategory, targetFormat, upload.sourceFormat.toLowerCase());
     if (plan.supported === false) {
       throw new UnsupportedConversionError(category, targetFormat);
     }

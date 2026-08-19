@@ -131,6 +131,22 @@ describe("conversion registry consistency", () => {
     expect(getAvailableTargetsForSource("document", "md")).toContain("md");
   });
 
+  it("planConversion enforces excludedTargetsBySource when a source format is given", () => {
+    // HTML -> Markdown is excluded for HTML sources even though the target exists.
+    expect(planConversion("document", "md", "html").supported).toBe(false);
+    expect(planConversion("document", "md", "htm").supported).toBe(false);
+    // The same target stays supported for non-excluded sources (and without a source).
+    expect(planConversion("document", "md", "txt").supported).toBe(true);
+    expect(planConversion("document", "md", "md").supported).toBe(true);
+    expect(planConversion("document", "md").supported).toBe(true);
+    // Non-excluded targets are unaffected by the source.
+    expect(planConversion("document", "txt", "html").supported).toBe(true);
+    expect(planConversion("document", "html", "html").supported).toBe(true);
+    // No exclusions exist outside document: source never blocks a registered target.
+    expect(planConversion("image", "png", "gif").supported).toBe(true);
+    expect(planConversion("data", "json", "csv").supported).toBe(true);
+  });
+
   it("HTML sources default to an honest target (plain text), not Markdown", () => {
     expect(CONVERSION_REGISTRY.document.defaultTarget("html")).toBe("txt");
     expect(CONVERSION_REGISTRY.document.defaultTarget("htm")).toBe("txt");

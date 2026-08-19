@@ -236,8 +236,14 @@ export type ConversionPlan =
   | { supported: true; category: FileCategory; target: TargetSpec }
   | { supported: false; category: FileCategory; reason: string };
 
-/** Resolve whether category -> target is a real, supported conversion. */
-export function planConversion(category: FileCategory, targetFormat: string): ConversionPlan {
+/** Resolve whether category -> target is a real, supported conversion.
+ *  Pass the source format to also enforce per-source exclusions
+ *  (e.g. HTML sources cannot become Markdown). */
+export function planConversion(
+  category: FileCategory,
+  targetFormat: string,
+  sourceFormat?: string
+): ConversionPlan {
   const spec = CONVERSION_REGISTRY[category];
   if (!spec) return { supported: false, category, reason: `Unknown category: ${category}` };
   const target = spec.targets[targetFormat?.toLowerCase()];
@@ -246,6 +252,13 @@ export function planConversion(category: FileCategory, targetFormat: string): Co
       supported: false,
       category,
       reason: `No ${targetFormat || "target"} conversion is supported for ${category} files`,
+    };
+  }
+  if (sourceFormat && spec.excludedTargetsBySource?.[sourceFormat]?.includes(target.format)) {
+    return {
+      supported: false,
+      category,
+      reason: `${sourceFormat} files cannot be converted to ${target.format}`,
     };
   }
   return { supported: true, category, target };
@@ -282,3 +295,25 @@ export function extensionForMime(mime: string): string | null {
   }
   return null;
 }
+
+/**
+ * Option keys the ffmpeg backend understands. Single shared contract between
+ * the client option filter (serverConvert.ts) and the server's strict
+ * OPTIONS_SCHEMA — a drift test keeps the two in sync.
+ */
+export const SERVER_OPTION_KEYS: readonly string[] = [
+  "quality",
+  "grayscale",
+  "rotation",
+  "maxWidth",
+  "maxHeight",
+  "bitrate",
+  "sampleRate",
+  "channels",
+  "volume",
+  "trimStart",
+  "trimEnd",
+  "resolution",
+  "fps",
+  "muteAudio",
+];

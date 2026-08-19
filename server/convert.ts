@@ -64,8 +64,9 @@ const VALID_CHANNELS = new Set([1, 2]);
  * Allowlist of every option the server understands, shared by all categories.
  * .strict() rejects unknown keys outright, so a client can never smuggle an
  * arbitrary key (e.g. `-map`) through to ffmpeg argument building.
+ * Key set is contract-tested against SERVER_OPTION_KEYS (see convert.test.ts).
  */
-const OPTIONS_SCHEMA = z
+export const OPTIONS_SCHEMA = z
   .object({
     quality: z.union([z.number(), z.string()]).optional(),
     grayscale: z.boolean().optional(),

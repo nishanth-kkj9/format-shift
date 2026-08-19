@@ -44,7 +44,9 @@ export function detectCategoryAndFormats(file: File): {
 
   // 2. Audio Formats
   if (type.startsWith("audio/") || AUDIO_EXTS.has(ext)) {
-    const sourceFormat = ext || "mp3";
+    // Browsers label audio-only WebM as "audio/webm" with a .webm extension,
+    // while the registry's canonical audio source is "weba".
+    const sourceFormat = (ext === "webm" ? "weba" : ext) || "mp3";
     return {
       category: "audio",
       sourceFormat,

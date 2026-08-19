@@ -101,7 +101,12 @@ export function resolveSourceFormat(
   originalFilename: string,
   category: string
 ): string {
-  if (detected) return detected.ext.toLowerCase();
+  if (detected) {
+    // file-type labels every WebM container (audio-only included) as "webm" /
+    // "video/webm"; for the audio category the canonical source is "weba".
+    if (category === "audio" && detected.ext === "webm") return "weba";
+    return detected.ext.toLowerCase();
+  }
   const spec = CONVERSION_REGISTRY[category as keyof typeof CONVERSION_REGISTRY];
   if (spec) {
     const mime = mimetype.toLowerCase();
@@ -263,8 +268,10 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
       const ft = await fileTypeFromBuffer(Buffer.concat(head));
       detected = ft ? { ext: ft.ext, mime: ft.mime } : null;
       if (detected) {
-        const accepted =
-          spec.sourceFormats.includes(detected.ext) || ALLOWED_MIME[cat].includes(detected.mime);
+        // WebM containers are indistinguishable by magic bytes (audio vs video),
+        // so an audio-category webm is accepted under the canonical "weba" source.
+        const sourceExt = detected.ext === "webm" && cat === "audio" ? "weba" : detected.ext;
+        const accepted = spec.sourceFormats.includes(sourceExt) || ALLOWED_MIME[cat].includes(detected.mime);
         if (!accepted) {
           throw new UploadError(`File content (${detected.mime}) does not match category ${category}`);
         }

@@ -59,6 +59,13 @@ const WAV_BYTES = Buffer.concat([
   Buffer.from([0x00, 0x00, 0x00, 0x00]),
 ]);
 
+// Minimal EBML header with DocType "webm" — file-type reports EVERY webm
+// container (audio-only included) as ext "webm" / mime "video/webm".
+const WEBM_BYTES = Buffer.from([
+  0x1a, 0x45, 0xdf, 0xa3, 0xa3, 0x42, 0x86, 0x81, 0x01, 0x42, 0xf7, 0x81, 0x01, 0x42, 0xf2, 0x81, 0x04, 0x42,
+  0xf3, 0x81, 0x08, 0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d, 0x42, 0x87, 0x81, 0x04,
+]);
+
 describe("parseUploadStream", () => {
   it("writes the file to disk byte-for-byte before resolving", async () => {
     const payload = multipartBody([
@@ -172,6 +179,36 @@ describe("parseUploadStream", () => {
     } finally {
       cleanup(up.tempDir, up.filePath);
     }
+  });
+
+  it("accepts audio-only webm and normalizes the source format to weba", async () => {
+    // file-type detects every webm container (audio or video) as ext "webm" /
+    // mime "video/webm", so an audio webm must be accepted via the weba source
+    // alias instead of being rejected as a mismatched category.
+    const payload = multipartBody([
+      { name: "category", value: "audio" },
+      { name: "targetFormat", value: "wav" },
+      { name: "options", value: "{}" },
+      { name: "file", filename: "clip.webm", type: "audio/webm", data: WEBM_BYTES },
+    ]);
+    const up = await parseUploadStream(fakeReq(payload, { "x-category": "audio" }));
+    try {
+      expect(up.sourceFormat).toBe("weba");
+    } finally {
+      cleanup(up.tempDir, up.filePath);
+    }
+  });
+
+  it("still rejects a genuinely mismatched binary in the audio category", async () => {
+    const payload = multipartBody([
+      { name: "category", value: "audio" },
+      { name: "targetFormat", value: "wav" },
+      { name: "options", value: "{}" },
+      { name: "file", filename: "clip.png", type: "audio/webm", data: PNG_BYTES },
+    ]);
+    await expect(parseUploadStream(fakeReq(payload, { "x-category": "audio" }))).rejects.toMatchObject({
+      status: 400,
+    });
   });
 
   it("rejects PDF uploads for the document category", async () => {

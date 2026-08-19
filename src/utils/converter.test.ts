@@ -52,6 +52,11 @@ describe("jsonToCsv", () => {
     const input = [{ name: "=HYPERLINK(evil.com)", plus: "+1+1", minus: "-cmd", at: "@SUM(A1:A2)" }];
     expect(jsonToCsv(input)).toBe("name,plus,minus,at\n'=HYPERLINK(evil.com),'+1+1,'-cmd,'@SUM(A1:A2)");
   });
+
+  it("guards against tab- and CR-prefixed formula cells (OWASP CSV injection)", () => {
+    const input = [{ tab: "\t=SUM(A1:A2)", cr: "\r=cmd", safe: "text" }];
+    expect(jsonToCsv(input)).toBe("tab,cr,safe\n'\t=SUM(A1:A2),'\r=cmd,text");
+  });
 });
 
 describe("csvToJson", () => {
@@ -88,6 +93,11 @@ describe("csvToJson", () => {
   it("handles fields with leading/trailing spaces", () => {
     const input = "name,age\n  Alice  ,  30";
     expect(csvToJson(input)).toEqual([{ name: "Alice", age: "30" }]);
+  });
+
+  it("preserves whitespace inside quoted fields (unquoted fields still trim)", () => {
+    const input = '"first name","note"\n"  Alice  ","  keep me  "';
+    expect(csvToJson(input)).toEqual([{ "first name": "  Alice  ", note: "  keep me  " }]);
   });
 });
 
@@ -464,5 +474,36 @@ describe("convertDataDocument derives the MIME from the real category", () => {
     const file = fakeFile("notes.txt", "text/plain", "# heading");
     const res = await convertDataDocument(file, "md", undefined, () => {});
     expect(res.convertedText).toBe("# heading");
+  });
+
+  it("does not misdetect markdown with a comma in the first line as CSV (md -> html)", async () => {
+    const file = fakeFile("note.md", "text/markdown", "Hello, world\n\n# Title\n\n**bold**");
+    const res = await convertDataDocument(file, "html", undefined, () => {});
+    expect(res.blob.type).toBe("text/html");
+    expect(res.convertedText).toContain("<h1>Title</h1>");
+    expect(res.convertedText).toContain("<b>bold</b>");
+  });
+
+  it("does not misdetect plain text with a comma in the first line as CSV (txt -> html)", async () => {
+    const file = fakeFile("note.txt", "text/plain", "Hello, world\nplain second line");
+    const res = await convertDataDocument(file, "html", undefined, () => {});
+    expect(res.blob.type).toBe("text/html");
+    expect(res.convertedText).toContain("<html>");
+  });
+
+  it("parses CSV whose first field is quoted (quoted header row)", async () => {
+    const file = fakeFile("data.csv", "text/csv", '"name","age"\n"Alice",30\n"Bob",25');
+    const res = await convertDataDocument(file, "json", undefined, () => {});
+    expect(res.blob.type).toBe("application/json");
+    expect(JSON.parse(res.convertedText!)).toEqual([
+      { name: "Alice", age: "30" },
+      { name: "Bob", age: "25" },
+    ]);
+  });
+
+  it("keeps detecting unquoted single-line CSV with multiple columns", async () => {
+    const file = fakeFile("data.csv", "text/csv", "a,b,c\n1,2,3");
+    const res = await convertDataDocument(file, "json", undefined, () => {});
+    expect(JSON.parse(res.convertedText!)).toEqual([{ a: "1", b: "2", c: "3" }]);
   });
 });
