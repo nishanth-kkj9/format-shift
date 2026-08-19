@@ -76,7 +76,6 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
 });
-app.use("/api/convert", apiLimiter);
 
 // Second, aggregate backstop across all IPs so a distributed burst can't tie up
 // every ffmpeg slot even when each individual IP stays under its own limit.
@@ -88,7 +87,14 @@ const globalLimiter = rateLimit({
   keyGenerator: (_req) => "global",
   message: { error: "Too many requests, please try again later." },
 });
-app.use("/api/convert", globalLimiter);
+
+// Integration tests hit /api/convert ~30+ times per suite run (per-IP cap is
+// 30), so the limiters would 429 legitimate test traffic. They guard real
+// deployments, not the test harness.
+if (process.env.NODE_ENV !== "test") {
+  app.use("/api/convert", apiLimiter);
+  app.use("/api/convert", globalLimiter);
+}
 
 // Simple request logger (no external dependency)
 app.use((req, res, next) => {

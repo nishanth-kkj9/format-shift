@@ -213,11 +213,17 @@ export async function convertFile(
   const cat = (validated.category || "").toLowerCase();
 
   // Any registered target is a legitimate server conversion (the registry's
-  // engine flag only steers client-side routing). The one exception is SVG,
-  // which ffmpeg cannot write — it is genuinely browser-only.
+  // engine flag only steers client-side routing). The exceptions are SVG,
+  // which ffmpeg cannot write, and visualizer targets (audio -> mp4/webm),
+  // which are produced client-side by the spectrum visualizer — no server
+  // pipeline exists for them, so serving a video-less mp4/webm here would
+  // silently produce the wrong artifact.
   const plan = planConversion(cat as FileCategory, tgt);
   if (plan.supported === false) throw new UnsupportedConversionError(cat, tgt);
   if (tgt === "svg") throw new UnsupportedConversionError(cat, tgt);
+  if (plan.target.capabilities?.visualizer) {
+    throw new UnsupportedConversionError(cat, `${tgt} (runs client-side via the spectrum visualizer)`);
+  }
 
   const mime = plan.target.mime;
 

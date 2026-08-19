@@ -21,7 +21,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
 
   const originalUrl = useMemo(
     () => item?.previewUrl || (item ? URL.createObjectURL(item.file) : ""),
-    [item?.previewUrl, item?.file]
+    [item]
   );
   const convertedUrl = item?.convertedUrl || "";
 
@@ -36,17 +36,17 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
     };
   }, [item, originalUrl]);
 
-  // Read the converted blob text for data/document previews
+  // Read the converted blob text for data/document previews. The modal remounts
+  // per item (conditional render in App.tsx), so convertedText starts empty for
+  // every new preview; non-text items never render it.
   useEffect(() => {
     if (item && (item.category === "data" || item.category === "document") && item.convertedBlob) {
       item.convertedBlob
         .text()
         .then(setConvertedText)
         .catch(() => setConvertedText(""));
-    } else {
-      setConvertedText("");
     }
-  }, [item?.category, item?.convertedBlob]);
+  }, [item, item?.category, item?.convertedBlob]);
 
   if (!item) return null;
 

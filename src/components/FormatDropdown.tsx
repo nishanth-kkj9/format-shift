@@ -14,7 +14,7 @@ interface FormatOption {
   description?: string;
 }
 
-export const FORMAT_OPTIONS: Record<FileCategory, FormatOption[]> = Object.fromEntries(
+const FORMAT_OPTIONS: Record<FileCategory, FormatOption[]> = Object.fromEntries(
   (Object.keys(CONVERSION_REGISTRY) as FileCategory[]).map((category) => [
     category,
     getAvailableTargets(category).map((format) => {

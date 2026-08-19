@@ -50,7 +50,6 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
       flipHorizontal: false,
       flipVertical: false,
       socialPreset: "custom",
-      stripExif: true,
     }
   );
 
@@ -200,24 +199,15 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                     />
                   </div>
 
-                  {/* EXIF Privacy Cleaner Shield Toggle */}
+                  {/* EXIF / metadata handling is inherent to the pipeline */}
                   <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
                     <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={imageOpts.stripExif !== false}
-                          onChange={(e) => setImageOpts({ ...imageOpts, stripExif: e.target.checked })}
-                          className="rounded accent-emerald-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span className="text-xs font-bold text-emerald-300">
-                          EXIF Privacy Metadata Cleaner Active
-                        </span>
-                      </label>
+                      <p className="text-xs font-bold text-emerald-300">EXIF / location metadata removed</p>
                       <p className="text-[11px] text-slate-300/80 leading-relaxed">
-                        Strips camera serial numbers, GPS location coordinates, exposure data, and capture
-                        timestamp metadata during conversion.
+                        Camera serial numbers, GPS coordinates, exposure data, and capture timestamps are
+                        stripped automatically during every conversion — this is inherent to the pipeline and
+                        not user-configurable.
                       </p>
                     </div>
                   </div>

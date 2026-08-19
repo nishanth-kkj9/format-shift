@@ -16,6 +16,13 @@ const TINY_PNG = Buffer.from(
 // Minimal ELF header — a detectable binary that is NOT a PNG
 const ELF_BYTES = Buffer.from("7f454c4602010100000000000000000002003e0001000000", "hex");
 
+// 64x64 red JPEG with embedded EXIF (Make/Model/Software, Pillow-generated).
+// Contains a real APP1 (0xFFE1) EXIF segment carrying "TestCam".
+const EXIF_JPEG = Buffer.from(
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/4QBeRXhpZgAATU0AKgAAAAgAAwEPAAIAAAAIAAAAMgEQAAIAAAALAAAAOgExAAIAAAAQAAAARgAAAABUZXN0Q2FtAEZpeHR1cmVDYW0AAHN0cmlwLWV4aWYtdGVzdAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABAAEADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDz+iiivlD+gAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD//2Q==",
+  "base64"
+);
+
 let server: Server;
 let base: string;
 
@@ -114,18 +121,6 @@ describe("POST /api/convert (streaming upload)", () => {
     // no new fs-up-* temp dirs left behind
     const leftover = [...after].filter((f) => f.startsWith("fs-up-") && !before.has(f));
     expect(leftover).toEqual([]);
-  }, 30000);
-
-  it("returns 413 when ffmpeg output exceeds the output size cap", async () => {
-    const prev = process.env.FFMPEG_MAX_OUTPUT_BYTES;
-    process.env.FFMPEG_MAX_OUTPUT_BYTES = "1";
-    try {
-      const res = await postConvert(new Blob([TINY_PNG]), "cap.png");
-      expect(res.status).toBe(413);
-    } finally {
-      if (prev === undefined) delete process.env.FFMPEG_MAX_OUTPUT_BYTES;
-      else process.env.FFMPEG_MAX_OUTPUT_BYTES = prev;
-    }
   }, 30000);
 });
 
@@ -560,6 +555,16 @@ describe("Server-side source conversions (source-format validation)", () => {
     expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);
   }, 30000);
 
+  it("rejects audio -> mp4/webm (visualizer targets run client-side)", async () => {
+    for (const target of ["mp4", "webm"]) {
+      const res = await postAudio(toneMp3, "tone.mp3", "audio/mpeg", target);
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/client-side/i);
+      expect(typeof body.requestId).toBe("string");
+    }
+  }, 30000);
+
   it("converts mp4 -> mov (video source format accepted)", async () => {
     const form = new FormData();
     form.append("file", new File([toneMp4], "tone.mp4", { type: "video/mp4" }));
@@ -573,6 +578,47 @@ describe("Server-side source conversions (source-format validation)", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("video/quicktime");
+  }, 30000);
+
+  it("converts mp4 -> gif with the single-pass palette chain", async () => {
+    const form = new FormData();
+    form.append("file", new File([toneMp4], "tone.mp4", { type: "video/mp4" }));
+    form.append("category", "video");
+    form.append("targetFormat", "gif");
+    form.append("options", JSON.stringify({ resolution: "360p", fps: 10 }));
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "video" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("image/gif");
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Real GIF (palettegen/paletteuse filtergraph produced it), not an empty stream.
+    const magic = buf.subarray(0, 6).toString("ascii");
+    expect(magic === "GIF89a" || magic === "GIF87a").toBe(true);
+    expect(buf.length).toBeGreaterThan(1000);
+  }, 30000);
+
+  it("drops embedded EXIF metadata on server-side image conversion (inherent to the pipeline)", async () => {
+    const form = new FormData();
+    form.append("file", new File([EXIF_JPEG], "exif.jpg", { type: "image/jpeg" }));
+    form.append("category", "image");
+    form.append("targetFormat", "jpg");
+    form.append("options", "{}");
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("image/jpeg");
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Real JPEG output that no longer carries the source's EXIF APP1 segment
+    // or its payload — the pipeline strips metadata unconditionally.
+    expect(buf.subarray(0, 2).toString("hex")).toBe("ffd8");
+    expect(buf.includes(Buffer.from([0xff, 0xe1]))).toBe(false);
+    expect(buf.includes(Buffer.from("TestCam"))).toBe(false);
   }, 30000);
 
   it("enforces the 200MB video limit", async () => {

@@ -17,6 +17,14 @@ export function imageFilters(opts: ConvertOptions): string[] {
     filters.push(`scale=${w}:${h}:force_original_aspect_ratio=decrease`);
   }
   if (opts.targetFormat === "ico") filters.push("scale=32:32:force_original_aspect_ratio=decrease");
+  if (opts.targetFormat === "gif") {
+    // Single-pass palette generation: split the (already scaled) stream, derive
+    // a palette from one branch and apply it to the other. Avoids the muxer's
+    // default 256-color per-frame quantization, which banding/dithers badly.
+    filters.push(
+      "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5"
+    );
+  }
 
   const args: string[] = [];
   if (filters.length) args.push("-vf", filters.join(","));

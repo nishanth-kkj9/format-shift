@@ -3,6 +3,7 @@ import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { imageArgs, imageFilters } from "./ffmpeg/filters";
+import { videoArgs } from "./ffmpeg/video";
 import { runFFmpeg } from "./ffmpeg/runner";
 import { validateOptions, InvalidOptionError } from "./convert";
 import {
@@ -53,6 +54,38 @@ describe("imageFilters", () => {
   it("adds ico scale", () => {
     const result = imageFilters({ targetFormat: "ico", category: "image" });
     expect(result.join(" ")).toContain("scale=32:32");
+  });
+
+  it("adds single-pass palette chain for gif", () => {
+    const result = imageFilters({ targetFormat: "gif", category: "image" });
+    const vf = result.join(" ");
+    expect(vf).toContain("-vf");
+    expect(vf).toContain("split[s0][s1]");
+    expect(vf).toContain("palettegen");
+    expect(vf).toContain("paletteuse");
+  });
+});
+
+describe("videoArgs", () => {
+  it("uses the target muxer without a duplicate gif -f", () => {
+    const args = videoArgs({ targetFormat: "gif", category: "video" });
+    const fIdx = args.lastIndexOf("-f");
+    expect(fIdx).toBeGreaterThan(-1);
+    expect(args[fIdx + 1]).toBe("gif");
+    expect(args.filter((a) => a === "-f")).toHaveLength(1);
+  });
+
+  it("adds a single-pass palette chain for gif", () => {
+    const vf = videoArgs({ targetFormat: "gif", category: "video" }).join(" ");
+    expect(vf).toContain("split[s0][s1]");
+    expect(vf).toContain("palettegen=stats_mode=diff");
+    expect(vf).toContain("paletteuse");
+  });
+
+  it("does not add palette filters for non-gif targets", () => {
+    const args = videoArgs({ targetFormat: "mp4", category: "video" });
+    expect(args).not.toContain("-vf");
+    expect(args).not.toContain("palettegen");
   });
 });
 

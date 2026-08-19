@@ -30,16 +30,23 @@ export function videoArgs(opts: ConvertOptions): string[] {
   const tgt = opts.targetFormat.toLowerCase();
   const args: string[] = [...VIDEO_CODECS[tgt]!];
 
-  const scaleFilter: string[] = [];
+  const filters: string[] = [];
   if (opts.resolution && opts.resolution !== "original" && RESOLUTIONS[opts.resolution]) {
-    scaleFilter.push(
+    filters.push(
       `scale=${RESOLUTIONS[opts.resolution]}:force_original_aspect_ratio=decrease:force_divisible_by=2`
+    );
+  }
+  if (tgt === "gif") {
+    // Single-pass palette generation (see filters.ts imageFilters): derive a
+    // palette from the stream itself, then map through it. stats_mode=diff
+    // samples per-frame differences so fast motion keeps its colors.
+    filters.push(
+      "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5"
     );
   }
   if (opts.muteAudio) args.push("-an");
   if (opts.fps) args.push("-r", String(opts.fps));
-  if (scaleFilter.length) args.push("-vf", scaleFilter.join(","));
-  if (tgt === "gif") args.push("-f", "gif");
+  if (filters.length) args.push("-vf", filters.join(","));
   args.push("-f", videoFormat(tgt));
   return args;
 }

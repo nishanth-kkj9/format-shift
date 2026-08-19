@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
+import { env } from "../config";
 
 // createRequire works under both tsx (ESM) and the esbuild CJS bundle.
 let nodeRequire: NodeRequire;
@@ -35,18 +36,19 @@ export const FFMPEG_BIN: string = resolveFfmpegBinary();
  * falls back to ffmpeg-static 5.3.0 (ships FFmpeg 6.1.1); Docker installs the
  * distro package and points FFMPEG_PATH at it. The resolved binary's version is
  * observed at runtime and reported on /api/health — nothing fails hard here so
- * CI/dev environments without a binary keep working.
+ * CI/dev environments without a binary keep working. Overridable via
+ * FFMPEG_MIN_FEATURE_VERSION (validated in config.ts).
  */
-export const FFMPEG_MIN_FEATURE_VERSION = "4.2.0";
+export const FFMPEG_MIN_FEATURE_VERSION = env.FFMPEG_MIN_FEATURE_VERSION || "4.2.0";
 
 /**
  * Oldest FFmpeg release that still receives security backports (FFmpeg LTS /
  * current distro baseline). Defaults to 5.1.0: Debian bookworm (the node:20-slim
  * Docker base) ships a security-patched 5.1.4, so a higher default would make
  * the health/ready gates always fail for the shipped image. Overridable via
- * FFMPEG_MIN_SECURITY_VERSION for stricter policies.
+ * FFMPEG_MIN_SECURITY_VERSION (validated in config.ts) for stricter policies.
  */
-export const FFMPEG_MIN_SECURITY_VERSION = process.env.FFMPEG_MIN_SECURITY_VERSION || "5.1.0";
+export const FFMPEG_MIN_SECURITY_VERSION = env.FFMPEG_MIN_SECURITY_VERSION || "5.1.0";
 
 /** Parse `ffmpeg -version` output into "major.minor.patch", or null. */
 export function parseFfmpegVersion(output: string): string | null {
@@ -104,21 +106,19 @@ export interface FFmpegRunOptions {
 
 /**
  * Cap concurrent ffmpeg processes so a burst of conversions can't exhaust the
- * server's CPU/RAM. Defaults to 2; override with FFMPEG_MAX_CONCURRENCY.
+ * server's CPU/RAM. Defaults to 2; override with FFMPEG_MAX_CONCURRENCY
+ * (validated in config.ts).
  */
-const MAX_CONCURRENT_FFMPEG = Math.max(1, Number(process.env.FFMPEG_MAX_CONCURRENCY) || 2);
+const MAX_CONCURRENT_FFMPEG = env.FFMPEG_MAX_CONCURRENCY;
 
 /** Max jobs parked in the queue before new conversions are rejected (503). */
 const MAX_QUEUE = Math.max(1, MAX_CONCURRENT_FFMPEG * 5);
-
-/** Default ffmpeg timeout (ms). Override via FFMPEG_TIMEOUT_MS. */
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Default cap on ffmpeg output size (bytes). Override via FFMPEG_MAX_OUTPUT_BYTES. */
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024 * 1024;
 
 function maxOutputBytes(): number {
-  return Math.max(1, Number(process.env.FFMPEG_MAX_OUTPUT_BYTES) || DEFAULT_MAX_OUTPUT_BYTES);
+  return env.FFMPEG_MAX_OUTPUT_BYTES ?? DEFAULT_MAX_OUTPUT_BYTES;
 }
 
 /** Thrown when the ffmpeg queue is full; the route maps it to HTTP 503. */
@@ -252,8 +252,8 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     };
     opts.signal?.addEventListener("abort", abort, { once: true });
 
-    // Kill the child if it exceeds the timeout.
-    const timeoutMs = opts.timeoutMs ?? (Number(process.env.FFMPEG_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
+    // Kill the child if it exceeds the timeout (validated in config.ts).
+    const timeoutMs = opts.timeoutMs ?? env.FFMPEG_TIMEOUT_MS;
     let timeoutHandle: NodeJS.Timeout | undefined;
     if (timeoutMs > 0) {
       timeoutHandle = setTimeout(() => {

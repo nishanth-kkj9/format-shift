@@ -25,31 +25,24 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<"python" | "node" | "html">("python");
   const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [codeData, setCodeData] = useState<CodeTemplateResponse["code"] | null>(null);
 
-  // Local state for user-selectable conversion parameters
+  // Local state for user-selectable conversion parameters. Reset via the parent's
+  // key={queue[0]?.id} remount, so no effect is needed to sync props -> state.
   const [selCategory, setSelCategory] = useState<FileCategory>((category as FileCategory) || "image");
   const [selSource, setSelSource] = useState(sourceFormat || "png");
   const [selTarget, setSelTarget] = useState(targetFormat || "jpg");
-
-  // When the modal opens, sync local state with the props (which come from queue[0]).
-  useEffect(() => {
-    if (isOpen) {
-      setSelCategory((category as FileCategory) || "image");
-      setSelSource(sourceFormat || "png");
-      setSelTarget(targetFormat || "jpg");
-    }
-  }, [isOpen, category, sourceFormat, targetFormat]);
 
   // Available source formats for the selected category
   const sourceOptions = CONVERSION_REGISTRY[selCategory]?.sourceFormats || [];
   // Available target formats for the selected category
   const targetOptions = getAvailableTargets(selCategory) || [];
 
+  // No code yet for the current selection until a fetch resolves.
+  const loading = codeData === null;
+
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
 
     fetch("/api/code-template", {
       method: "POST",
@@ -59,7 +52,6 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
       .then((res) => res.json())
       .then((data: CodeTemplateResponse) => {
         setCodeData(data.code);
-        setLoading(false);
       })
       .catch(() => {
         // Fallback local code templates
@@ -68,7 +60,6 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
           node: `// Node.js Code\nimport sharp from 'sharp';\n\nawait sharp('input.${selSource}').toFile('output.${selTarget}');`,
           html: `<!-- HTML5 + Canvas JS -->\n<script>\nconst canvas = document.createElement('canvas');\n</script>`,
         });
-        setLoading(false);
       });
   }, [isOpen, selCategory, selSource, selTarget]);
 
@@ -142,6 +133,7 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                   onChange={(e) => {
                     const cat = e.target.value as FileCategory;
                     setSelCategory(cat);
+                    setCodeData(null); // show loading while the new selection fetches
                     // Reset source/target to sensible defaults for the new category
                     const srcs = CONVERSION_REGISTRY[cat]?.sourceFormats || [];
                     const tgts = getAvailableTargets(cat) || [];
@@ -163,7 +155,10 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                 </label>
                 <select
                   value={selSource}
-                  onChange={(e) => setSelSource(e.target.value)}
+                  onChange={(e) => {
+                    setSelSource(e.target.value);
+                    setCodeData(null);
+                  }}
                   className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
                 >
                   {sourceOptions.map((f) => (
@@ -179,7 +174,10 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                 </label>
                 <select
                   value={selTarget}
-                  onChange={(e) => setSelTarget(e.target.value)}
+                  onChange={(e) => {
+                    setSelTarget(e.target.value);
+                    setCodeData(null);
+                  }}
                   className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-900 border border-white/15 text-white cursor-pointer"
                 >
                   {targetOptions.map((f) => (

@@ -662,6 +662,7 @@ export default function App() {
         />
 
         <CodeSnippetModal
+          key={queue[0]?.id ?? "none"}
           isOpen={isCodeModalOpen}
           onClose={() => setIsCodeModalOpen(false)}
           category={queue[0]?.category || "image"}

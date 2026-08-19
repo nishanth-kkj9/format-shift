@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,9 +9,6 @@ import {
   getFFmpegVersion,
   FFMPEG_MIN_FEATURE_VERSION,
   FFMPEG_BIN,
-  runFFmpeg,
-  OutputLimitError,
-  getFFmpegConcurrency,
 } from "./runner";
 
 // 1x1 transparent PNG
@@ -68,13 +65,18 @@ describe("resolved ffmpeg binary version", () => {
 });
 
 describe("output size limit", () => {
-  function withOutputLimit(max: string, fn: () => Promise<void>) {
+  // The cap is read from the env validated at import time (server/config.ts),
+  // so each scenario loads a fresh module graph with the cap set beforehand.
+  async function loadRunnerWithCap(max: string) {
     const prev = process.env.FFMPEG_MAX_OUTPUT_BYTES;
     process.env.FFMPEG_MAX_OUTPUT_BYTES = max;
-    return fn().finally(() => {
+    vi.resetModules();
+    try {
+      return await import("./runner");
+    } finally {
       if (prev === undefined) delete process.env.FFMPEG_MAX_OUTPUT_BYTES;
       else process.env.FFMPEG_MAX_OUTPUT_BYTES = prev;
-    });
+    }
   }
 
   it("rejects output that exceeds FFMPEG_MAX_OUTPUT_BYTES and cleans up", async () => {
@@ -82,11 +84,10 @@ describe("output size limit", () => {
     const input = join(dir, "in.png");
     writeFileSync(input, TINY_PNG);
     try {
-      await withOutputLimit("10", async () => {
-        await expect(runFFmpeg(["-f", "image2", "-c:v", "png"], { inputPath: input })).rejects.toBeInstanceOf(
-          OutputLimitError
-        );
-      });
+      const { runFFmpeg, OutputLimitError, getFFmpegConcurrency } = await loadRunnerWithCap("10");
+      await expect(runFFmpeg(["-f", "image2", "-c:v", "png"], { inputPath: input })).rejects.toBeInstanceOf(
+        OutputLimitError
+      );
       expect(getFFmpegConcurrency().active).toBe(0);
       expect(readdirSync(dir)).toEqual(["in.png"]); // output temp dir removed
     } finally {
@@ -99,11 +100,10 @@ describe("output size limit", () => {
     const input = join(dir, "in.png");
     writeFileSync(input, TINY_PNG);
     try {
-      await withOutputLimit(String(1024 * 1024), async () => {
-        const res = await runFFmpeg(["-f", "image2", "-c:v", "png"], { inputPath: input });
-        expect(res.size).toBeGreaterThan(0);
-        res.cleanup();
-      });
+      const { runFFmpeg } = await loadRunnerWithCap(String(1024 * 1024));
+      const res = await runFFmpeg(["-f", "image2", "-c:v", "png"], { inputPath: input });
+      expect(res.size).toBeGreaterThan(0);
+      res.cleanup();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -118,36 +118,35 @@ describe("output size limit", () => {
     const input = join(sandbox, "in.png");
     writeFileSync(input, TINY_PNG);
     try {
-      await withOutputLimit("1024", async () => {
-        // The endless lavfi sine keeps the child alive, so the 250ms poll
-        // observes the cap being exceeded while the process is still running and
-        // kills it (SIGKILL -> close with a null exit code). Only the fix that
-        // checks outputLimitExceeded before the exit code turns this into an
-        // OutputLimitError instead of a generic "ffmpeg failed (null)".
-        const started = Date.now();
-        await expect(
-          runFFmpeg(
-            [
-              "-f",
-              "lavfi",
-              "-i",
-              "sine=frequency=440",
-              "-map",
-              "1:a",
-              "-c:a",
-              "pcm_s16le",
-              "-f",
-              "wav",
-              "-flush_packets",
-              "1",
-            ],
-            { inputPath: input }
-          )
-        ).rejects.toBeInstanceOf(OutputLimitError);
-        // The infinite source can never finish on its own: a fast rejection
-        // proves the process was terminated by the limit guard, not normal exit.
-        expect(Date.now() - started).toBeLessThan(10_000);
-      });
+      const { runFFmpeg, OutputLimitError, getFFmpegConcurrency } = await loadRunnerWithCap("1024");
+      // The endless lavfi sine keeps the child alive, so the 250ms poll
+      // observes the cap being exceeded while the process is still running and
+      // kills it (SIGKILL -> close with a null exit code). Only the fix that
+      // checks outputLimitExceeded before the exit code turns this into an
+      // OutputLimitError instead of a generic "ffmpeg failed (null)".
+      const started = Date.now();
+      await expect(
+        runFFmpeg(
+          [
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440",
+            "-map",
+            "1:a",
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "wav",
+            "-flush_packets",
+            "1",
+          ],
+          { inputPath: input }
+        )
+      ).rejects.toBeInstanceOf(OutputLimitError);
+      // The infinite source can never finish on its own: a fast rejection
+      // proves the process was terminated by the limit guard, not normal exit.
+      expect(Date.now() - started).toBeLessThan(10_000);
       expect(getFFmpegConcurrency().active).toBe(0);
       // Output temp dir must have been cleaned up (only the input fixture remains).
       expect(readdirSync(sandbox)).toEqual(["in.png"]);

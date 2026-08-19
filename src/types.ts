@@ -35,7 +35,6 @@ export interface ImageConversionOptions {
   flipHorizontal: boolean;
   flipVertical: boolean;
   socialPreset?: SocialMediaPreset | undefined;
-  stripExif?: boolean | undefined; // Default true (canvas rasterization removes EXIF metadata)
 }
 
 export interface AudioConversionOptions {
@@ -54,8 +53,6 @@ export interface VideoConversionOptions {
   resolution: "original" | "1080p" | "720p" | "480p" | "360p";
   fps: 15 | 24 | 30 | 60;
   muteAudio: boolean;
-  gifFps?: number | undefined;
-  gifWidth?: number | undefined;
 }
 
 export interface DataConversionOptions {
