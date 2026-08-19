@@ -57,6 +57,26 @@ describe("jsonToCsv", () => {
     const input = [{ tab: "\t=SUM(A1:A2)", cr: "\r=cmd", safe: "text" }];
     expect(jsonToCsv(input)).toBe("tab,cr,safe\n'\t=SUM(A1:A2),'\r=cmd,text");
   });
+
+  it("quotes headers containing the delimiter", () => {
+    const input = [{ "last, first": "Doe" }];
+    expect(jsonToCsv(input)).toBe('"last, first"\nDoe');
+  });
+
+  it("quotes headers containing double quotes", () => {
+    const input = [{ 'name "aka"': "Doe" }];
+    expect(jsonToCsv(input)).toBe('"name ""aka"""\nDoe');
+  });
+
+  it("quotes headers containing newlines", () => {
+    const input = [{ "line\nbreak": 1 }];
+    expect(jsonToCsv(input)).toBe('"line\nbreak"\n1');
+  });
+
+  it("guards formula-prefixed headers", () => {
+    const input = [{ "=SUM": 1 }];
+    expect(jsonToCsv(input)).toBe("'=SUM\n1");
+  });
 });
 
 describe("csvToJson", () => {
@@ -115,6 +135,28 @@ describe("jsonToXml", () => {
     expect(result).toContain("<user>");
     expect(result).toContain("<name>Alice</name>");
   });
+
+  it("prefixes keys that start with a digit so the tag is a valid XML name", () => {
+    const result = jsonToXml({ "123name": "x" });
+    expect(result).toContain("<_123name>x</_123name>");
+  });
+
+  it("namespaces empty keys instead of emitting an empty tag", () => {
+    const result = jsonToXml({ "": "v" });
+    expect(result).toContain("<_>v</_>");
+  });
+
+  it("sanitizes keys containing XML-unsafe characters", () => {
+    const result = jsonToXml({ "a<b>c": 1 });
+    expect(result).toContain("<a_b_c>1</a_b_c>");
+    expect(result).not.toContain("<a<b>");
+  });
+
+  it("sanitizes an invalid root name", () => {
+    const result = jsonToXml({ a: 1 }, "123root");
+    expect(result).toContain("<_123root>");
+    expect(result).toContain("</_123root>");
+  });
 });
 
 describe("jsonToYaml", () => {
@@ -130,6 +172,31 @@ describe("jsonToYaml", () => {
     const result = jsonToYaml(input);
     expect(result).toContain("items:");
     expect(result).toContain("- 1");
+  });
+
+  it("quotes keys that look like numbers or booleans", () => {
+    const yaml = jsonToYaml({ 123: "v", true: "v" });
+    expect(yaml).toContain('"123": v');
+    expect(yaml).toContain('"true": v');
+  });
+
+  it("quotes keys with leading or trailing whitespace", () => {
+    const yaml = jsonToYaml({ " padded ": "v" });
+    expect(yaml).toContain('" padded ": v');
+  });
+
+  it("quotes keys containing YAML indicators", () => {
+    const yaml = jsonToYaml({ "- ": "v", "[x]": "v", "!tag": "v", "a # c": "v" });
+    expect(yaml).toContain('"- ": v');
+    expect(yaml).toContain('"[x]": v');
+    expect(yaml).toContain('"!tag": v');
+    expect(yaml).toContain('"a # c": v');
+  });
+
+  it("keeps simple keys unquoted", () => {
+    const yaml = jsonToYaml({ name: "Alice", "a-b": 1 });
+    expect(yaml).toContain("name: Alice");
+    expect(yaml).toContain("a-b: 1");
   });
 });
 

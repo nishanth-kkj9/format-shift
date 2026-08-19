@@ -137,6 +137,14 @@ export class OutputLimitError extends Error {
   }
 }
 
+/** Thrown when an ffmpeg run exceeds its timeout; the route maps it to HTTP 504. */
+export class FFmpegTimeoutError extends Error {
+  constructor() {
+    super("FFmpeg conversion timed out");
+    this.name = "FFmpegTimeoutError";
+  }
+}
+
 let activeCount = 0;
 const waiters: (() => void)[] = [];
 
@@ -244,6 +252,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     const err: Buffer[] = [];
     let settled = false;
     let outputLimitExceeded = false;
+    let timedOut = false;
 
     const abort = () => {
       if (!settled && proc && proc.exitCode === null) {
@@ -258,6 +267,7 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     if (timeoutMs > 0) {
       timeoutHandle = setTimeout(() => {
         if (!settled) {
+          timedOut = true;
           abort();
           // The "close" handler performs cleanup and rejects.
         }
@@ -297,6 +307,14 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
       if (opts.signal?.aborted) {
         cleanupTempDir(outPath);
         reject(new DOMException("Conversion aborted", "AbortError"));
+        return;
+      }
+      // The timeout kills the child with SIGKILL, so close() carries a null
+      // exit code here. Decide on the timeout flag BEFORE the exit code,
+      // otherwise a timeout kill is misreported as a generic ffmpeg failure.
+      if (timedOut) {
+        cleanupTempDir(outPath);
+        reject(new FFmpegTimeoutError());
         return;
       }
       // The output-limit guard kills the child with SIGKILL, so close() carries

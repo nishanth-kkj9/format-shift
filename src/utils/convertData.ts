@@ -170,25 +170,27 @@ export function jsonToCsv(json: unknown, delimiter = ","): string {
   const arr = Array.isArray(json) ? json : [json];
   if (arr.length === 0) return "";
   const headers = Object.keys(arr[0] as Record<string, unknown>);
-  const headerLine = headers.join(delimiter);
+  // Headers are cells too: quote/guard them exactly like values, otherwise a
+  // key containing the delimiter or a quote breaks the header row and a
+  // formula-prefixed key becomes a spreadsheet injection vector.
+  const headerLine = headers.map((h) => csvCell(h, delimiter)).join(delimiter);
   const rows = arr.map((item) => {
     const record = item as Record<string, unknown>;
-    return headers
-      .map((header) => {
-        const val = record[header];
-        if (val === null || val === undefined) return "";
-        const strVal = typeof val === "object" ? JSON.stringify(val) : String(val);
-        // Spreadsheet formula injection guard: prefix cells that start with
-        // =,+,-,@ plus tab/CR prefixes (OWASP CSV injection) so Excel/sheets
-        // treat them as text.
-        const guarded = /^[=+\-@\t\r]/.test(strVal) && !strVal.startsWith('"') ? "'" + strVal : strVal;
-        return guarded.includes(delimiter) || guarded.includes("\n") || guarded.includes('"')
-          ? `"${guarded.replace(/"/g, '""')}"`
-          : guarded;
-      })
-      .join(delimiter);
+    return headers.map((header) => csvCell(record[header], delimiter)).join(delimiter);
   });
   return [headerLine, ...rows].join("\n");
+}
+
+function csvCell(value: unknown, delimiter: string): string {
+  if (value === null || value === undefined) return "";
+  const strVal = typeof value === "object" ? JSON.stringify(value) : String(value);
+  // Spreadsheet formula injection guard: prefix cells that start with
+  // =,+,-,@ plus tab/CR prefixes (OWASP CSV injection) so Excel/sheets
+  // treat them as text.
+  const guarded = /^[=+\-@\t\r]/.test(strVal) && !strVal.startsWith('"') ? "'" + strVal : strVal;
+  return guarded.includes(delimiter) || guarded.includes("\n") || guarded.includes('"')
+    ? `"${guarded.replace(/"/g, '""')}"`
+    : guarded;
 }
 
 export function csvToJson(csvText: string, delimiter = ","): Record<string, string>[] {
@@ -217,8 +219,18 @@ function escapeXml(value: unknown): string {
     .replace(/'/g, "&apos;");
 }
 
+// Deterministic XML-name normalization: strip XML-unsafe characters, then
+// guarantee a valid start character (letter or underscore). Collisions between
+// distinct keys that normalize identically are possible but deterministic.
+function xmlElementName(key: string): string {
+  let name = key.replace(/[^a-zA-Z0-9_]/g, "_");
+  if (!/^[a-zA-Z_]/.test(name)) name = `_${name}`;
+  return name;
+}
+
 export function jsonToXml(obj: unknown, rootName = "root"): string {
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootName}>\n`;
+  const cleanRoot = xmlElementName(rootName);
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<${cleanRoot}>\n`;
   function buildXml(data: unknown, indent = "  ") {
     if (Array.isArray(data)) {
       data.forEach((item) => {
@@ -228,7 +240,7 @@ export function jsonToXml(obj: unknown, rootName = "root"): string {
       });
     } else if (typeof data === "object" && data !== null) {
       Object.entries(data as Record<string, unknown>).forEach(([key, val]) => {
-        const cleanKey = key.replace(/[^a-zA-Z0-9_]/g, "_");
+        const cleanKey = xmlElementName(key);
         if (typeof val === "object" && val !== null) {
           xml += `${indent}<${cleanKey}>\n`;
           buildXml(val, indent + "  ");
@@ -242,7 +254,7 @@ export function jsonToXml(obj: unknown, rootName = "root"): string {
     }
   }
   buildXml(obj);
-  xml += `</${rootName}>`;
+  xml += `</${cleanRoot}>`;
   return xml;
 }
 
@@ -260,6 +272,8 @@ function yamlScalar(value: unknown): string {
       value === "~" ||
       /^[-+0-9.]/.test(value) ||
       /[:#&*!|>'"%@`]/.test(value) ||
+      // eslint-disable-next-line no-useless-escape -- V8 drops a class whose `[` is followed by `]`; the escapes are required
+      /[\[\]{},]/.test(value) ||
       /^\s|\s$/.test(value) ||
       /[\n\r\t]/.test(value)
     ) {
@@ -284,7 +298,10 @@ export function jsonToYaml(obj: unknown, indent = 0): string {
     });
   } else if (typeof obj === "object" && obj !== null) {
     Object.entries(obj as Record<string, unknown>).forEach(([key, val]) => {
-      const safeKey = /[:#]/.test(key) ? JSON.stringify(key) : key;
+      // Keys go through the scalar serializer too: a key that looks like a
+      // number/boolean or starts with a YAML indicator (dash, bracket, tag,
+      // comment) would otherwise be misparsed or corrupt the document.
+      const safeKey = yamlScalar(key);
       if (typeof val === "object" && val !== null) {
         yaml += `${spaces}${safeKey}:\n${jsonToYaml(val, indent + 2)}`;
       } else {

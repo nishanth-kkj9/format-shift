@@ -8,7 +8,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { spawn } from "node:child_process";
-import { runFFmpeg } from "./runner";
+import { runFFmpeg, FFmpegTimeoutError } from "./runner";
 
 const mockSpawn = vi.mocked(spawn);
 
@@ -58,5 +58,38 @@ describe("runFFmpeg child-process failures", () => {
     const err = await pending;
     expect(err).toBeInstanceOf(DOMException);
     expect((err as DOMException).name).toBe("AbortError");
+  });
+
+  it("rejects with FFmpegTimeoutError when the timeout fires", async () => {
+    mockSpawn.mockReturnValue(fakeChild() as never);
+    const pending = runFFmpeg(["-t", "60", "-"], { timeoutMs: 25 }).catch((e: Error) => e);
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
+    const child = mockSpawn.mock.results[0].value;
+    await vi.waitFor(() => expect(child.kill).toHaveBeenCalled());
+    child.emit("close", null);
+    const err = await pending;
+    expect(err).toBeInstanceOf(FFmpegTimeoutError);
+    expect((err as Error).message).toMatch(/timed out/i);
+  });
+
+  it("does not turn a timeout into a generic ffmpeg failure", async () => {
+    mockSpawn.mockReturnValue(fakeChild() as never);
+    const pending = runFFmpeg(["-t", "60", "-"], { timeoutMs: 25 }).catch((e: Error) => e);
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
+    const child = mockSpawn.mock.results[0].value;
+    await vi.waitFor(() => expect(child.kill).toHaveBeenCalled());
+    child.emit("close", 1);
+    const err = await pending;
+    expect(err).toBeInstanceOf(FFmpegTimeoutError);
+  });
+
+  it("clears the timeout timer when the process finishes first", async () => {
+    mockSpawn.mockReturnValue(fakeChild() as never);
+    const pending = runFFmpeg(["-t", "60", "-"], { timeoutMs: 250 });
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
+    const child = mockSpawn.mock.results[0].value;
+    child.emit("close", 0);
+    await expect(pending).resolves.toBeTruthy();
+    expect(child.kill).not.toHaveBeenCalled();
   });
 });

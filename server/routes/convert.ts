@@ -8,7 +8,7 @@ import {
   UnsupportedConversionError,
   InvalidOptionError,
 } from "../convert";
-import { ServerBusyError, OutputLimitError } from "../ffmpeg/runner";
+import { ServerBusyError, OutputLimitError, FFmpegTimeoutError } from "../ffmpeg/runner";
 import type { ParsedUpload } from "../upload";
 import { planConversion, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
 import { randomUUID } from "node:crypto";
@@ -133,15 +133,17 @@ convertRouter.post("/", async (req, res) => {
           ? err.status
           : err instanceof ServerBusyError
             ? 503
-            : err instanceof OutputLimitError
-              ? 413
-              : err instanceof InvalidOptionError
-                ? 400
-                : err instanceof UnsupportedFormatError ||
-                    err instanceof UnsupportedConversionError ||
-                    err instanceof NoAudioStreamError
+            : err instanceof FFmpegTimeoutError
+              ? 504
+              : err instanceof OutputLimitError
+                ? 413
+                : err instanceof InvalidOptionError
                   ? 400
-                  : 500,
+                  : err instanceof UnsupportedFormatError ||
+                      err instanceof UnsupportedConversionError ||
+                      err instanceof NoAudioStreamError
+                    ? 400
+                    : 500,
       durationMs,
     });
 
@@ -150,6 +152,9 @@ convertRouter.post("/", async (req, res) => {
     }
     if (err instanceof ServerBusyError) {
       return errorResponse(res, 503, message, requestId);
+    }
+    if (err instanceof FFmpegTimeoutError) {
+      return errorResponse(res, 504, message, requestId);
     }
     if (err instanceof OutputLimitError) {
       return errorResponse(res, 413, message, requestId);

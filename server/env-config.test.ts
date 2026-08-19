@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { Server } from "node:http";
+import { envSchema } from "./config";
 
 // Runtime env knobs are validated once at import time (server/config.ts) and
 // read from that validated object (server/ffmpeg/runner.ts). These tests need
@@ -51,5 +52,67 @@ describe("Import-time env config is actually enforced", () => {
     form.append("options", "{}");
     const res = await fetch(`${base}/api/convert`, { method: "POST", body: form });
     expect(res.status).toBe(413);
+  }, 30000);
+});
+
+describe("env schema semantic upper bounds", () => {
+  it("accepts an empty env (all defaults)", () => {
+    expect(envSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepts boundary values", () => {
+    expect(envSchema.safeParse({ PORT: "65535" }).success).toBe(true);
+    expect(envSchema.safeParse({ FFMPEG_MAX_CONCURRENCY: "64" }).success).toBe(true);
+    expect(envSchema.safeParse({ FFMPEG_TIMEOUT_MS: "1800000" }).success).toBe(true);
+    expect(envSchema.safeParse({ FFMPEG_MAX_OUTPUT_BYTES: "4294967296" }).success).toBe(true);
+  });
+
+  it("rejects PORT above 65535", () => {
+    expect(envSchema.safeParse({ PORT: "70000" }).success).toBe(false);
+  });
+
+  it("rejects absurdly high FFMPEG_MAX_CONCURRENCY", () => {
+    expect(envSchema.safeParse({ FFMPEG_MAX_CONCURRENCY: "100" }).success).toBe(false);
+  });
+
+  it("rejects FFMPEG_TIMEOUT_MS above 30 minutes", () => {
+    expect(envSchema.safeParse({ FFMPEG_TIMEOUT_MS: "3600000" }).success).toBe(false);
+  });
+
+  it("rejects FFMPEG_MAX_OUTPUT_BYTES above 4 GiB", () => {
+    expect(envSchema.safeParse({ FFMPEG_MAX_OUTPUT_BYTES: "8589934592" }).success).toBe(false);
+  });
+});
+
+describe("FFmpeg timeout is reported distinctly", () => {
+  let server2: Server;
+  let base2: string;
+
+  beforeAll(async () => {
+    process.env.FFMPEG_TIMEOUT_MS = "1";
+    vi.resetModules();
+    const { app } = await import("./app");
+    await new Promise<void>((resolve) => {
+      server2 = app.listen(0, "127.0.0.1", () => {
+        const addr = server2.address();
+        base2 = `http://127.0.0.1:${(addr as { port: number }).port}`;
+        resolve();
+      });
+    });
+  });
+
+  afterAll(() => {
+    server2.close();
+    delete process.env.FFMPEG_TIMEOUT_MS;
+  });
+
+  it("returns 504 when a conversion exceeds the timeout", async () => {
+    const form = new FormData();
+    form.append("file", new File([TINY_PNG], "cap.png", { type: "image/png" }));
+    form.append("category", "image");
+    form.append("targetFormat", "webp");
+    form.append("options", "{}");
+    const res = await fetch(`${base2}/api/convert`, { method: "POST", body: form });
+    expect(res.status).toBe(504);
   }, 30000);
 });
