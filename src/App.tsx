@@ -10,7 +10,13 @@ import {
   convertDataDocument,
 } from "./utils/converter";
 import { extractFileMetadata } from "./utils/metadata";
-import { clearHistoryRevoking, historyForStorage, hydrateHistory } from "./utils/historyCleanup";
+import {
+  clearHistoryRevoking,
+  historyForStorage,
+  hydrateHistory,
+  trimHistoryRevoking,
+  MAX_HISTORY_ENTRIES,
+} from "./utils/historyCleanup";
 import { convertServerSide, needsServerConversion } from "./utils/serverConvert";
 import { zipBatchOverLimit, ZIP_MAX_TOTAL_BYTES } from "./utils/zipPolicy";
 import { extensionForMime } from "./core/conversionRegistry";
@@ -37,7 +43,15 @@ const CodeSnippetModal = lazy(() =>
 const FormatGuide = lazy(() => import("./components/FormatGuide").then((m) => ({ default: m.FormatGuide })));
 
 export default function App() {
-  const [isDark, setIsDark] = useState(true);
+  // Theme preference is persisted so the toggle actually sticks across sessions.
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("formatshift_theme");
+      return saved === null ? true : saved === "dark";
+    } catch {
+      return true;
+    }
+  });
   const [selectedCategory, setSelectedCategory] = useState<FileCategory | "all">("all");
 
   // File Queue
@@ -47,7 +61,9 @@ export default function App() {
   // stripped on write / on load, so restored entries never carry dead links).
   const [history, setHistory] = useState<ConversionHistoryItem[]>(() => {
     try {
-      return hydrateHistory(localStorage.getItem("formatshift_history"));
+      // Older versions could have persisted more than the cap; trim on load so
+      // runtime state respects the same bound as storage.
+      return hydrateHistory(localStorage.getItem("formatshift_history")).slice(0, MAX_HISTORY_ENTRIES);
     } catch {
       return [];
     }
@@ -69,12 +85,17 @@ export default function App() {
   // retained set is atomic with the history transition, never render-captured.
   const queueUrlsRef = useRef<Set<string>>(new Set());
 
-  // Sync theme class to <html> tag
+  // Sync theme class to <html> tag and persist the preference.
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
+    }
+    try {
+      localStorage.setItem("formatshift_theme", isDark ? "dark" : "light");
+    } catch {
+      // ignore storage failure; theme still applies for the session
     }
   }, [isDark]);
 
@@ -336,7 +357,10 @@ export default function App() {
         downloadUrl: convertedUrl,
       };
 
-      setHistory((prev) => [historyEntry, ...prev]);
+      // Add to history, bounded to MAX_HISTORY_ENTRIES. The queue URL set is
+      // current here (convertedUrl was added synchronously above), so an entry
+      // trimmed off the end is revoked only when no queue item still shows it.
+      setHistory((prev) => trimHistoryRevoking([historyEntry, ...prev], queueUrlsRef.current));
     } catch (err: unknown) {
       // Ignore abort errors as they're handled separately
       if (err instanceof DOMException && err.name === "AbortError") {
@@ -490,7 +514,7 @@ export default function App() {
   return (
     <div
       className={`min-h-screen flex flex-col font-sans transition-colors duration-200 relative overflow-x-hidden ${
-        isDark ? "bg-[#0b1120] text-slate-100" : "bg-slate-950 text-slate-100"
+        isDark ? "bg-[#0b1120] text-slate-100" : "bg-slate-100 text-slate-900"
       }`}
     >
       {/* Mesh Background & Ambient Floating Glowing Orbs */}

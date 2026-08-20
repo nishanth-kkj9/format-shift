@@ -37,18 +37,20 @@ export const FFMPEG_BIN: string = resolveFfmpegBinary();
  * distro package and points FFMPEG_PATH at it. The resolved binary's version is
  * observed at runtime and reported on /api/health — nothing fails hard here so
  * CI/dev environments without a binary keep working. Overridable via
- * FFMPEG_MIN_FEATURE_VERSION (validated in config.ts).
+ * FFMPEG_MIN_FEATURE_VERSION (validated in config.ts as major.minor.patch).
  */
 export const FFMPEG_MIN_FEATURE_VERSION = env.FFMPEG_MIN_FEATURE_VERSION || "4.2.0";
 
 /**
- * Oldest FFmpeg release that still receives security backports (FFmpeg LTS /
- * current distro baseline). Defaults to 5.1.0: Debian bookworm (the node:20-slim
- * Docker base) ships a security-patched 5.1.4, so a higher default would make
- * the health/ready gates always fail for the shipped image. Overridable via
- * FFMPEG_MIN_SECURITY_VERSION (validated in config.ts) for stricter policies.
+ * Patch-freshness floor: the oldest FFmpeg release considered current enough to
+ * pass the health/ready gates. Defaults to 5.1.9, the security-patched baseline
+ * shipped by Debian bookworm (the node:22-slim Docker base, DSA-6276-1 fixes
+ * landed in 7:5.1.9-0+deb12u1) — a lower floor would let an older, unpatched
+ * point release satisfy readiness. Treat this as a maintained policy value:
+ * bump it alongside the runtime image's FFmpeg package updates. Overridable via
+ * FFMPEG_MIN_SECURITY_VERSION (validated in config.ts as major.minor.patch).
  */
-export const FFMPEG_MIN_SECURITY_VERSION = env.FFMPEG_MIN_SECURITY_VERSION || "5.1.0";
+export const FFMPEG_MIN_SECURITY_VERSION = env.FFMPEG_MIN_SECURITY_VERSION || "5.1.9";
 
 /** Parse `ffmpeg -version` output into "major.minor.patch", or null. */
 export function parseFfmpegVersion(output: string): string | null {

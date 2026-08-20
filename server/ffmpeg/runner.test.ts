@@ -8,6 +8,7 @@ import {
   isFfmpegAtLeast,
   getFFmpegVersion,
   FFMPEG_MIN_FEATURE_VERSION,
+  FFMPEG_MIN_SECURITY_VERSION,
   FFMPEG_BIN,
 } from "./runner";
 
@@ -43,6 +44,21 @@ describe("isFfmpegAtLeast", () => {
     expect(isFfmpegAtLeast("4.1.0", FFMPEG_MIN_FEATURE_VERSION)).toBe(false);
     expect(isFfmpegAtLeast("4.2", "4.2.1")).toBe(false);
     expect(isFfmpegAtLeast(null, FFMPEG_MIN_FEATURE_VERSION)).toBe(false);
+  });
+});
+
+describe("FFmpeg security patch floor", () => {
+  it("accepts the exact floor and newer patched releases", () => {
+    expect(FFMPEG_MIN_SECURITY_VERSION).toBe("5.1.9");
+    expect(isFfmpegAtLeast("5.1.9", FFMPEG_MIN_SECURITY_VERSION)).toBe(true);
+    expect(isFfmpegAtLeast("6.1.1", FFMPEG_MIN_SECURITY_VERSION)).toBe(true);
+    expect(isFfmpegAtLeast("7.1.5", FFMPEG_MIN_SECURITY_VERSION)).toBe(true);
+  });
+
+  it("rejects point releases below the security floor", () => {
+    expect(isFfmpegAtLeast("5.1.0", FFMPEG_MIN_SECURITY_VERSION)).toBe(false);
+    expect(isFfmpegAtLeast("5.1.4", FFMPEG_MIN_SECURITY_VERSION)).toBe(false);
+    expect(isFfmpegAtLeast("5.1.8", FFMPEG_MIN_SECURITY_VERSION)).toBe(false);
   });
 });
 

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { revokeHistoryUrls, clearHistoryRevoking, historyForStorage, hydrateHistory } from "./historyCleanup";
+import {
+  revokeHistoryUrls,
+  clearHistoryRevoking,
+  historyForStorage,
+  hydrateHistory,
+  trimHistoryRevoking,
+  MAX_HISTORY_ENTRIES,
+} from "./historyCleanup";
 import { ConversionHistoryItem } from "../types";
 
 function entry(id: string, downloadUrl: string): ConversionHistoryItem {
@@ -66,6 +73,49 @@ describe("clearHistoryRevoking (atomic clear vs queue race)", () => {
   });
 });
 
+describe("trimHistoryRevoking (bounded in-memory history)", () => {
+  function newestFirstHistory(count: number) {
+    // Newest at index 0, oldest at the end — the same ordering App maintains.
+    return Array.from({ length: count }, (_, i) => entry(`n${i}`, `blob:n${i}`));
+  }
+
+  it("bounds history to MAX_HISTORY_ENTRIES, newest-first", () => {
+    const history = newestFirstHistory(MAX_HISTORY_ENTRIES + 1);
+    const next = trimHistoryRevoking(history, new Set(), vi.fn());
+    expect(next).toHaveLength(MAX_HISTORY_ENTRIES);
+    expect(next[0].id).toBe("n0"); // newest retained
+    expect(next[0].downloadUrl).toBe("blob:n0");
+  });
+
+  it("revokes URLs dropped by the bound when the queue does not retain them", () => {
+    const revoke = vi.fn();
+    const history = newestFirstHistory(MAX_HISTORY_ENTRIES + 3);
+    trimHistoryRevoking(history, new Set(), revoke);
+    // Only the last 3 entries fall off the end; only their URLs are revoked.
+    expect(revoke).toHaveBeenCalledTimes(3);
+    expect(revoke).toHaveBeenCalledWith("blob:n100");
+    expect(revoke).toHaveBeenCalledWith("blob:n102");
+    expect(revoke).not.toHaveBeenCalledWith("blob:n0");
+    expect(revoke).not.toHaveBeenCalledWith("blob:n99");
+  });
+
+  it("does not revoke a dropped URL still referenced by an active queue item", () => {
+    const revoke = vi.fn();
+    const history = newestFirstHistory(MAX_HISTORY_ENTRIES + 2);
+    // The oldest dropped entries are still being shown/downloaded from the queue.
+    trimHistoryRevoking(history, new Set(["blob:n100", "blob:n101"]), revoke);
+    expect(revoke).toHaveBeenCalledTimes(0);
+  });
+
+  it("revokes nothing when history is within the bound", () => {
+    const revoke = vi.fn();
+    const history = newestFirstHistory(MAX_HISTORY_ENTRIES - 1);
+    const next = trimHistoryRevoking(history, new Set(), revoke);
+    expect(next).toHaveLength(MAX_HISTORY_ENTRIES - 1);
+    expect(revoke).not.toHaveBeenCalled();
+  });
+});
+
 describe("history persistence (metadata only, never blob URLs)", () => {
   it("strips session-scoped downloadUrl before writing to storage", () => {
     const forStorage = historyForStorage([entry("1", "blob:dead-after-reload")]);
@@ -74,13 +124,16 @@ describe("history persistence (metadata only, never blob URLs)", () => {
     expect(forStorage[0].convertedSize).toBe(2);
   });
 
-  it("caps persisted history to the last 100 entries", () => {
-    const history = Array.from({ length: 150 }, (_, i) => entry(String(i), `blob:${i}`));
+  it("caps persisted history to the newest 100 entries (runtime is newest-first)", () => {
+    // App prepends each new entry, so index 0 is the newest (highest id) and
+    // index 149 the oldest. A `slice(-100)`-style cap would keep the OLDEST
+    // 100 — the bug this regression guards against.
+    const history = Array.from({ length: 150 }, (_, i) => entry(String(149 - i), `blob:${149 - i}`));
     const forStorage = historyForStorage(history);
     expect(forStorage).toHaveLength(100);
-    expect(forStorage[0].originalName).toBe("a.txt");
-    expect(forStorage[0].id).toBe("50");
-    expect(forStorage[99].id).toBe("149");
+    expect(forStorage[0].id).toBe("149"); // newest kept
+    expect(forStorage[99].id).toBe("50"); // 100th newest kept
+    expect(forStorage.some((item) => item.id === "0")).toBe(false); // oldest dropped
   });
 
   it("drops stale blob URLs when hydrating persisted history", () => {

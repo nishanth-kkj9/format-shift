@@ -82,6 +82,23 @@ describe("env schema semantic upper bounds", () => {
   it("rejects FFMPEG_MAX_OUTPUT_BYTES above 4 GiB", () => {
     expect(envSchema.safeParse({ FFMPEG_MAX_OUTPUT_BYTES: "8589934592" }).success).toBe(false);
   });
+
+  it("accepts well-formed version pins as major.minor.patch", () => {
+    expect(envSchema.safeParse({ FFMPEG_MIN_SECURITY_VERSION: "5.1.9" }).success).toBe(true);
+    expect(envSchema.safeParse({ FFMPEG_MIN_FEATURE_VERSION: "4.2.0" }).success).toBe(true);
+  });
+
+  it("rejects malformed FFMPEG_MIN_SECURITY_VERSION values", () => {
+    expect(envSchema.safeParse({ FFMPEG_MIN_SECURITY_VERSION: "5.1" }).success).toBe(false);
+    expect(envSchema.safeParse({ FFMPEG_MIN_SECURITY_VERSION: "5" }).success).toBe(false);
+    expect(envSchema.safeParse({ FFMPEG_MIN_SECURITY_VERSION: "5.1.x" }).success).toBe(false);
+    expect(envSchema.safeParse({ FFMPEG_MIN_SECURITY_VERSION: "v5.1.9" }).success).toBe(false);
+  });
+
+  it("rejects malformed FFMPEG_MIN_FEATURE_VERSION values", () => {
+    expect(envSchema.safeParse({ FFMPEG_MIN_FEATURE_VERSION: "4.2" }).success).toBe(false);
+    expect(envSchema.safeParse({ FFMPEG_MIN_FEATURE_VERSION: "4" }).success).toBe(false);
+  });
 });
 
 describe("FFmpeg timeout is reported distinctly", () => {

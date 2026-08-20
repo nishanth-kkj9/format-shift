@@ -525,6 +525,12 @@ of opening a public issue so they can be fixed before disclosure.
   semaphore + queue (over capacity → HTTP 503), a hard timeout, and cleanup on
   success, error, and client disconnect. Error messages are sanitized (no
   absolute paths, no memory addresses).
+- **ffmpeg version policy:** `/api/ready` and `/api/health` check the resolved
+  binary against a feature floor (`FFMPEG_MIN_FEATURE_VERSION`, default 4.2.0)
+  and a patch-freshness floor (`FFMPEG_MIN_SECURITY_VERSION`, default 5.1.9, the
+  security-patched baseline in the node:22-slim Docker image). An older, unpatched
+  binary makes readiness report 503. Both values must be `major.minor.patch`
+  strings.
 - **Downloads:** converted files are served with
   `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so
   converted SVG/HTML can never be rendered inline.

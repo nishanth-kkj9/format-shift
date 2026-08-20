@@ -34,16 +34,38 @@ export function clearHistoryRevoking(
 }
 
 /**
+ * Single bound for history everywhere: runtime state and persisted storage both
+ * keep at most this many entries. Runtime history is newest-first, so the first
+ * N entries are the newest N — keeping this in one place means the ordering
+ * invariant can't drift between memory and storage again.
+ */
+export const MAX_HISTORY_ENTRIES = 100;
+
+/**
  * History persistence must never carry blob URLs: they are session-scoped and
  * die on reload, so a persisted entry would advertise a download that cannot
- * work. Strip the volatile field before writing to storage. Only the last 100
- * entries are persisted so an unbounded history can't blow the 5MB
+ * work. Strip the volatile field before writing to storage. Only the newest
+ * 100 entries are persisted so an unbounded history can't blow the 5MB
  * localStorage quota (QuotaExceededError would break persistence entirely).
  */
-const MAX_STORED_HISTORY = 100;
-
 export function historyForStorage(history: ConversionHistoryItem[]): ConversionHistoryItem[] {
-  return history.slice(-MAX_STORED_HISTORY).map(({ downloadUrl, ...rest }) => rest);
+  return history.slice(0, MAX_HISTORY_ENTRIES).map(({ downloadUrl, ...rest }) => rest);
+}
+
+/**
+ * Bound in-memory history to MAX_HISTORY_ENTRIES (newest-first, matching how
+ * App prepends entries) and revoke the blob URLs of entries dropped off the end
+ * — unless the queue still references them (those are revoked later, when the
+ * queue item is removed). `revoke` is injectable for testing.
+ */
+export function trimHistoryRevoking(
+  history: ConversionHistoryItem[],
+  retainedUrls: ReadonlySet<string>,
+  revoke: (url: string) => void = (url) => URL.revokeObjectURL(url)
+): ConversionHistoryItem[] {
+  const dropped = history.slice(MAX_HISTORY_ENTRIES);
+  revokeHistoryUrls(dropped, retainedUrls, revoke);
+  return history.slice(0, MAX_HISTORY_ENTRIES);
 }
 
 /** Read persisted history, dropping any stale blob URLs from older versions. */

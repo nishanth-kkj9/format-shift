@@ -121,3 +121,217 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ---- Light theme -------------------------------------------------------
+   The UI is authored dark-first, so the default `.dark` presentation is
+   untouched. When <html> has no `.dark` class (the toggle removes it), remap
+   the shared utility classes to a real light palette. These rules are
+   un-layered, so they win over the Tailwind utility layer for the light state.
+   Keeping the remap in one place means components never need per-theme
+   conditionals. */
+html:not(.dark) {
+  color-scheme: light;
+}
+
+/* Text */
+html:not(.dark) .text-white {
+  color: #0f172a;
+}
+html:not(.dark) .text-slate-100 {
+  color: #1e293b;
+}
+html:not(.dark) .text-slate-200 {
+  color: #334155;
+}
+html:not(.dark) .text-slate-300 {
+  color: #475569;
+}
+html:not(.dark) .text-slate-300\/80 {
+  color: rgba(71, 85, 105, 0.8);
+}
+html:not(.dark) .text-slate-300\/70 {
+  color: rgba(71, 85, 105, 0.7);
+}
+html:not(.dark) .text-slate-400 {
+  color: #64748b;
+}
+html:not(.dark) .text-slate-500 {
+  color: #64748b;
+}
+html:not(.dark) .hover\:text-white:hover {
+  color: #0f172a;
+}
+html:not(.dark) .group:hover .group-hover\:text-white {
+  color: #0f172a;
+}
+html:not(.dark) .group:hover .group-hover\:text-slate-200 {
+  color: #334155;
+}
+
+/* Accent text on light surfaces (darken the 300/400 shades for contrast) */
+html:not(.dark) .text-indigo-400,
+html:not(.dark) .text-indigo-300 {
+  color: #4f46e5;
+}
+html:not(.dark) .text-indigo-200 {
+  color: #4338ca;
+}
+html:not(.dark) .hover\:text-indigo-300:hover {
+  color: #4338ca;
+}
+html:not(.dark) .hover\:text-indigo-200:hover {
+  color: #3730a3;
+}
+html:not(.dark) .text-emerald-400 {
+  color: #059669;
+}
+html:not(.dark) .text-emerald-300 {
+  color: #047857;
+}
+html:not(.dark) .hover\:text-emerald-300:hover {
+  color: #065f46;
+}
+html:not(.dark) .text-amber-400 {
+  color: #d97706;
+}
+html:not(.dark) .text-amber-300 {
+  color: #b45309;
+}
+html:not(.dark) .hover\:text-amber-300:hover {
+  color: #92400e;
+}
+html:not(.dark) .text-rose-400 {
+  color: #e11d48;
+}
+html:not(.dark) .text-rose-300 {
+  color: #be123c;
+}
+html:not(.dark) .hover\:text-rose-300:hover {
+  color: #9f1239;
+}
+html:not(.dark) .text-blue-400 {
+  color: #2563eb;
+}
+html:not(.dark) .text-blue-300 {
+  color: #1d4ed8;
+}
+html:not(.dark) .text-purple-400 {
+  color: #7e22ce;
+}
+html:not(.dark) .text-purple-300 {
+  color: #6b21a8;
+}
+html:not(.dark) .text-teal-400 {
+  color: #0d9488;
+}
+html:not(.dark) .text-pink-400 {
+  color: #db2777;
+}
+
+/* Surfaces */
+html:not(.dark) .bg-slate-950,
+html:not(.dark) .bg-slate-900 {
+  background-color: #ffffff;
+}
+html:not(.dark) .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.97);
+}
+html:not(.dark) .bg-slate-900\/90 {
+  background-color: rgba(255, 255, 255, 0.92);
+}
+html:not(.dark) .bg-slate-900\/80 {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+html:not(.dark) .bg-slate-950\/70 {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+html:not(.dark) .bg-slate-950\/60 {
+  background-color: rgba(241, 245, 249, 0.6);
+}
+html:not(.dark) .bg-slate-800 {
+  background-color: #e2e8f0;
+}
+
+/* Subtle tinted surfaces (white-based glass in dark -> slate-tinted in light) */
+html:not(.dark) .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.04);
+}
+html:not(.dark) .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.08);
+}
+html:not(.dark) .bg-white\/15 {
+  background-color: rgba(15, 23, 42, 0.1);
+}
+html:not(.dark) .bg-white\/20 {
+  background-color: rgba(15, 23, 42, 0.12);
+}
+html:not(.dark) .hover\:bg-white\/10:hover {
+  background-color: rgba(15, 23, 42, 0.08);
+}
+html:not(.dark) .hover\:bg-white\/15:hover {
+  background-color: rgba(15, 23, 42, 0.1);
+}
+html:not(.dark) .hover\:bg-white\/20:hover {
+  background-color: rgba(15, 23, 42, 0.12);
+}
+
+/* Borders */
+html:not(.dark) .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+html:not(.dark) .border-white\/15 {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+html:not(.dark) .border-white\/20 {
+  border-color: rgba(15, 23, 42, 0.18);
+}
+html:not(.dark) .border-white\/30 {
+  border-color: rgba(15, 23, 42, 0.25);
+}
+html:not(.dark) .border-white\/5 {
+  border-color: rgba(15, 23, 42, 0.05);
+}
+html:not(.dark) .border-white {
+  border-color: #e2e8f0;
+}
+html:not(.dark) .border-slate-700 {
+  border-color: #cbd5e1;
+}
+
+/* Shared component primitives */
+html:not(.dark) .glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.15);
+}
+html:not(.dark) .glass-input {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+html:not(.dark) .mesh-bg {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(99, 102, 241, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(168, 85, 247, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, #e2e8f0 0%, #cbd5e1 100%);
+}
+
+/* Keep white text on solid accent buttons/active pills (the global text-white
+   remap above would otherwise darken it against the colored background). */
+html:not(.dark) .bg-indigo-600.text-white,
+html:not(.dark) .bg-indigo-500.text-white,
+html:not(.dark) .bg-indigo-600\/90.text-white,
+html:not(.dark) .bg-emerald-500.text-white,
+html:not(.dark) .bg-emerald-600.text-white,
+html:not(.dark) .bg-blue-600.text-white,
+html:not(.dark) .bg-orange-600.text-white,
+html:not(.dark) .bg-amber-500.text-white,
+html:not(.dark) .from-indigo-500.text-white,
+html:not(.dark) .from-indigo-600.text-white,
+html:not(.dark) .from-blue-600.text-white,
+html:not(.dark) .via-indigo-600.text-white {
+  color: #ffffff;
+}
