@@ -1,4 +1,4 @@
-import { spawn, ChildProcess, execFileSync } from "node:child_process";
+import { spawn, ChildProcess, execFile } from "node:child_process";
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,16 +73,31 @@ export function isFfmpegAtLeast(version: string | null, min: string): boolean {
 }
 
 let cachedVersion: string | null | undefined;
+let versionPromise: Promise<string | null> | undefined;
 
-/** Version of the resolved ffmpeg binary, or null when it can't be determined. Cached. */
-export function getFFmpegVersion(): string | null {
-  if (cachedVersion !== undefined) return cachedVersion;
-  try {
-    cachedVersion = parseFfmpegVersion(execFileSync(FFMPEG_BIN, ["-version"], { encoding: "utf8" }));
-  } catch {
-    cachedVersion = null;
+/** Version of the resolved ffmpeg binary, or null when it can't be determined.
+ *  Async so the first probe never blocks the event loop; the result is cached
+ *  and reused by `getFFmpegVersionSync`. */
+export function getFFmpegVersion(): Promise<string | null> {
+  if (cachedVersion !== undefined) return Promise.resolve(cachedVersion);
+  if (!versionPromise) {
+    versionPromise = new Promise<string | null>((resolve) => {
+      execFile(FFMPEG_BIN, ["-version"], { encoding: "utf8" }, (err, stdout) => {
+        if (err) {
+          cachedVersion = null;
+        } else {
+          cachedVersion = parseFfmpegVersion(stdout);
+        }
+        resolve(cachedVersion);
+      });
+    });
   }
-  return cachedVersion;
+  return versionPromise;
+}
+
+/** Cached version once the async probe has resolved, or null while it's pending. */
+export function getFFmpegVersionSync(): string | null {
+  return cachedVersion ?? null;
 }
 
 export interface FFmpegResult {
@@ -181,12 +196,13 @@ export function acquireFFmpegSlot(signal?: AbortSignal | undefined): Promise<voi
     };
     const waiter = () => {
       signal?.removeEventListener("abort", onAbort);
+      // Increment synchronously when the slot is granted so the concurrency
+      // gauge is never briefly too low between release and the microtask flush.
+      activeCount++;
       resolve();
     };
     signal?.addEventListener("abort", onAbort, { once: true });
     waiters.push(waiter);
-  }).then(() => {
-    activeCount++;
   });
 }
 

@@ -331,6 +331,22 @@ describe("ffmpeg concurrency queue", () => {
     }
   });
 
+  it("increments active synchronously when a queued job is granted a slot", async () => {
+    const { max } = getFFmpegConcurrency();
+    for (let i = 0; i < max; i++) await acquireFFmpegSlot();
+    const pending = acquireFFmpegSlot();
+    try {
+      releaseFFmpegSlot(); // grant the queued slot
+      // Sync check before any microtask flush: the granted job must already be
+      // counted as active (regression guard for the .then() increment).
+      expect(getFFmpegConcurrency().active).toBe(max);
+      await pending;
+      releaseFFmpegSlot(); // release the granted job's slot
+    } finally {
+      for (let i = 0; i < max - 1; i++) releaseFFmpegSlot();
+    }
+  });
+
   it("rejects immediately when the signal is already aborted", async () => {
     const { active, queued } = getFFmpegConcurrency();
     const controller = new AbortController();

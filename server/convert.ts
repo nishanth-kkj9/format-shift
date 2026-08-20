@@ -204,7 +204,6 @@ const VIDEO_TARGETS = new Set(Object.keys(VIDEO_CODECS));
  * (never buffers the whole result in RAM) and supports cancellation via signal.
  */
 export async function convertFile(
-  _input: Buffer,
   opts: ConvertOptions,
   inputPath?: string,
   runOptions: FFmpegRunOptions = {}

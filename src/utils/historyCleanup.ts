@@ -36,10 +36,14 @@ export function clearHistoryRevoking(
 /**
  * History persistence must never carry blob URLs: they are session-scoped and
  * die on reload, so a persisted entry would advertise a download that cannot
- * work. Strip the volatile field before writing to storage.
+ * work. Strip the volatile field before writing to storage. Only the last 100
+ * entries are persisted so an unbounded history can't blow the 5MB
+ * localStorage quota (QuotaExceededError would break persistence entirely).
  */
+const MAX_STORED_HISTORY = 100;
+
 export function historyForStorage(history: ConversionHistoryItem[]): ConversionHistoryItem[] {
-  return history.map(({ downloadUrl, ...rest }) => rest);
+  return history.slice(-MAX_STORED_HISTORY).map(({ downloadUrl, ...rest }) => rest);
 }
 
 /** Read persisted history, dropping any stale blob URLs from older versions. */

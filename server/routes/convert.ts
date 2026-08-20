@@ -77,7 +77,6 @@ convertRouter.post("/", async (req, res) => {
     // Options validation happens in convertFile -> validateOptions
 
     const { mime, result } = await convertFile(
-      Buffer.alloc(0),
       {
         category: upload.category,
         targetFormat: upload.targetFormat,

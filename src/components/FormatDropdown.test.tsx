@@ -64,4 +64,27 @@ describe("FormatDropdown", () => {
     fireEvent.click(jpgOption);
     expect(onChange).toHaveBeenCalledWith("jpg");
   });
+
+  it("offers only the whitelisted format when availableFormats is a single entry", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<FormatDropdown value="jpg" onChange={onChange} category="image" availableFormats={["jpg"]} />);
+
+    await user.click(screen.getByRole("button", { name: /choose output format, currently jpg/i }));
+    await waitFor(() => expect(screen.getByRole("listbox")).toBeInTheDocument());
+
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent(/JPEG/);
+  });
+
+  it("does not open the listbox when disabled", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<FormatDropdown value="jpg" onChange={onChange} category="image" disabled />);
+
+    const trigger = screen.getByRole("button", { name: /choose output format, currently jpg/i });
+    await user.click(trigger);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
 });

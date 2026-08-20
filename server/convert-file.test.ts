@@ -21,7 +21,7 @@ describe("convertFile", () => {
 
   it("runs the image pipeline for image targets and returns the plan mime", async () => {
     mockRunFFmpeg.mockResolvedValue(fakeResult);
-    const { mime, data } = await convertFile(Buffer.alloc(0), {
+    const { mime, data } = await convertFile({
       targetFormat: "jpg",
       category: "image",
     });
@@ -32,7 +32,7 @@ describe("convertFile", () => {
 
   it("runs the audio pipeline for audio targets", async () => {
     mockRunFFmpeg.mockResolvedValue(fakeResult);
-    const { mime } = await convertFile(Buffer.alloc(0), {
+    const { mime } = await convertFile({
       targetFormat: "wav",
       category: "audio",
     });
@@ -41,7 +41,7 @@ describe("convertFile", () => {
 
   it("runs the video pipeline for video targets", async () => {
     mockRunFFmpeg.mockResolvedValue(fakeResult);
-    const { mime } = await convertFile(Buffer.alloc(0), {
+    const { mime } = await convertFile({
       targetFormat: "mov",
       category: "video",
       resolution: "original",
@@ -51,30 +51,30 @@ describe("convertFile", () => {
 
   it("maps an audio-stream-less failure to NoAudioStreamError", async () => {
     mockRunFFmpeg.mockRejectedValue(new Error("does not contain any stream"));
-    await expect(
-      convertFile(Buffer.alloc(0), { targetFormat: "mp3", category: "audio" })
-    ).rejects.toBeInstanceOf(NoAudioStreamError);
+    await expect(convertFile({ targetFormat: "mp3", category: "audio" })).rejects.toBeInstanceOf(
+      NoAudioStreamError
+    );
   });
 
   it("rejects svg as browser-only even though it is registered", async () => {
-    await expect(
-      convertFile(Buffer.alloc(0), { targetFormat: "svg", category: "image" })
-    ).rejects.toBeInstanceOf(UnsupportedConversionError);
+    await expect(convertFile({ targetFormat: "svg", category: "image" })).rejects.toBeInstanceOf(
+      UnsupportedConversionError
+    );
     expect(mockRunFFmpeg).not.toHaveBeenCalled();
   });
 
   it("rejects a conversion the registry does not support", async () => {
-    await expect(
-      convertFile(Buffer.alloc(0), { targetFormat: "pdf", category: "image" })
-    ).rejects.toBeInstanceOf(UnsupportedConversionError);
+    await expect(convertFile({ targetFormat: "pdf", category: "image" })).rejects.toBeInstanceOf(
+      UnsupportedConversionError
+    );
   });
 
   it("rejects a registered-but-browser-only category/target pair", async () => {
     // data/json is a real registered target, but the server has no pipeline for
     // it — convertFile must refuse rather than hand garbage to ffmpeg.
-    await expect(
-      convertFile(Buffer.alloc(0), { targetFormat: "json", category: "data" })
-    ).rejects.toBeInstanceOf(UnsupportedConversionError);
+    await expect(convertFile({ targetFormat: "json", category: "data" })).rejects.toBeInstanceOf(
+      UnsupportedConversionError
+    );
     expect(mockRunFFmpeg).not.toHaveBeenCalled();
   });
 });

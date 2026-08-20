@@ -74,6 +74,15 @@ describe("history persistence (metadata only, never blob URLs)", () => {
     expect(forStorage[0].convertedSize).toBe(2);
   });
 
+  it("caps persisted history to the last 100 entries", () => {
+    const history = Array.from({ length: 150 }, (_, i) => entry(String(i), `blob:${i}`));
+    const forStorage = historyForStorage(history);
+    expect(forStorage).toHaveLength(100);
+    expect(forStorage[0].originalName).toBe("a.txt");
+    expect(forStorage[0].id).toBe("50");
+    expect(forStorage[99].id).toBe("149");
+  });
+
   it("drops stale blob URLs when hydrating persisted history", () => {
     const raw = JSON.stringify([entry("1", "blob:stale"), { ...entry("2", "blob:also-stale"), id: "2" }]);
     const restored = hydrateHistory(raw);

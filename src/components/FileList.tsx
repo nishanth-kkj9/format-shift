@@ -65,6 +65,10 @@ export const FileList: React.FC<FileListProps> = ({
             const isDone = item.status === "completed";
             const isConverting = item.status === "converting";
             const isError = item.status === "error";
+            // Social presets pin the output to one fixed format (jpg); the
+            // dropdown then offers nothing else to pick.
+            const socialPreset = item.category === "image" && item.options.image?.socialPreset;
+            const isPresetLocked = !!socialPreset && socialPreset !== "custom";
 
             // Category Icon fallback
             let IconComponent = File;
@@ -217,8 +221,8 @@ export const FileList: React.FC<FileListProps> = ({
                         value={item.targetFormat}
                         onChange={(fmt) => onTargetFormatChange(item.id, fmt)}
                         category={item.category}
-                        availableFormats={item.availableTargets}
-                        disabled={isConverting}
+                        availableFormats={isPresetLocked ? ["jpg"] : item.availableTargets}
+                        disabled={isConverting || isPresetLocked}
                       />
 
                       {/* Fine-Tuning Gear Options Modal Trigger */}

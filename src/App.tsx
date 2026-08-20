@@ -191,7 +191,17 @@ export default function App() {
         if (item.id !== itemId) return item;
         // Spectrum visualizer outputs a video — force a video target so routing + extension match.
         const isSpectrum = item.category === "audio" && updatedOptions.audio?.spectrumVisualizer;
-        const targetFormat = isSpectrum && item.targetFormat !== "webm" ? "mp4" : item.targetFormat;
+        // Social presets are for posting; social platforms want a single raster
+        // format, so a preset pins the target to jpg.
+        const isPreset =
+          item.category === "image" &&
+          updatedOptions.image?.socialPreset &&
+          updatedOptions.image.socialPreset !== "custom";
+        const targetFormat = isPreset
+          ? "jpg"
+          : isSpectrum && item.targetFormat !== "webm"
+            ? "mp4"
+            : item.targetFormat;
         return { ...item, options: updatedOptions, targetFormat };
       })
     );

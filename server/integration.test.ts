@@ -5,7 +5,13 @@ import { readdirSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { FFMPEG_BIN, acquireFFmpegSlot, releaseFFmpegSlot, getFFmpegConcurrency } from "./ffmpeg/runner";
+import {
+  FFMPEG_BIN,
+  acquireFFmpegSlot,
+  releaseFFmpegSlot,
+  getFFmpegConcurrency,
+  getFFmpegVersion,
+} from "./ffmpeg/runner";
 
 // 1x1 transparent PNG — has real PNG magic bytes (\x89PNG\r\n\x1a\n)
 const TINY_PNG = Buffer.from(
@@ -27,6 +33,9 @@ let server: Server;
 let base: string;
 
 beforeAll(async () => {
+  // Warm the ffmpeg version cache (probed async since the runner change) so
+  // /api/ready reports a real version string instead of null.
+  await getFFmpegVersion();
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => {
       const addr = server.address();

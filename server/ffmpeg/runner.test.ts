@@ -57,8 +57,8 @@ describe("resolved ffmpeg binary version", () => {
     }
   });
 
-  it.skipIf(!binaryAvailable)("reports the active binary version and it meets the minimum", () => {
-    const version = getFFmpegVersion();
+  it.skipIf(!binaryAvailable)("reports the active binary version and it meets the minimum", async () => {
+    const version = await getFFmpegVersion();
     expect(version).toBeTruthy();
     expect(isFfmpegAtLeast(version, FFMPEG_MIN_FEATURE_VERSION)).toBe(true);
   });

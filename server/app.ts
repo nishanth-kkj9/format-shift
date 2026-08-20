@@ -10,7 +10,7 @@ import { convertRouter } from "./routes/convert";
 import { templatesRouter } from "./routes/templates";
 import {
   getFFmpegConcurrency,
-  getFFmpegVersion,
+  getFFmpegVersionSync,
   isFfmpegAtLeast,
   FFMPEG_MIN_FEATURE_VERSION,
   FFMPEG_MIN_SECURITY_VERSION,
@@ -61,7 +61,10 @@ app.use(
     // SAMEORIGIN) and the common strict-origin-when-cross-origin referrer policy.
     frameguard: { action: "deny" },
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-    crossOriginEmbedderPolicy: false,
+    // Cross-origin isolation is only enabled in production: dev/test rely on the
+    // Vite proxy and same-origin tooling that COEP's CORP enforcement can break.
+    crossOriginEmbedderPolicy: process.env.NODE_ENV === "production",
+    crossOriginOpenerPolicy: process.env.NODE_ENV === "production",
     // HSTS is managed by the ENABLE_HSTS-gated middleware above so it is only
     // ever sent over real HTTPS deployments, never plain HTTP.
     hsts: false,
@@ -109,7 +112,7 @@ app.use((req, res, next) => {
 // API endpoints
 app.get("/api/health", (_req, res) => {
   const concurrency = getFFmpegConcurrency();
-  const ffmpegVersion = getFFmpegVersion();
+  const ffmpegVersion = getFFmpegVersionSync();
   res.json({
     status: "ok",
     app: "FormatShift Universal Converter",
@@ -129,7 +132,7 @@ app.get("/api/health", (_req, res) => {
 // Liveness + readiness for Docker/K8s probes: 200 only when the server can
 // actually convert (ffmpeg present and meeting both version baselines).
 app.get("/api/ready", (_req, res) => {
-  const ffmpegVersion = getFFmpegVersion();
+  const ffmpegVersion = getFFmpegVersionSync();
   const ffmpegAvailable = Boolean(FFMPEG_BIN);
   const ffmpegFeatureCompatible = isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_FEATURE_VERSION);
   const ffmpegSecurityBaselineOk = isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_SECURITY_VERSION);
