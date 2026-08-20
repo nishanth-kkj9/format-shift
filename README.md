@@ -2,34 +2,36 @@
 
 # FormatShift
 
-### Universal File Conversion for Images, Audio, Video, Documents & Data
+**Universal File Conversion for Images, Audio, Video, Documents & Data**
 
-A browser-first conversion app built with React and TypeScript. FormatShift converts common files locally in the browser when possible and uses a server-side `ffmpeg` pipeline for formats that require native codecs or seekable media output.
+A browser-first conversion application built with **React 19**, **TypeScript**, and **Express**. FormatShift converts files locally in the browser when possible using Canvas, Web Audio, and browser APIs — and falls back to a hardened **FFmpeg** server pipeline for formats that require native codecs or seekable media output.
 
-**Private by default for browser conversions · Batch processing · Live previews · Conversion history · ZIP downloads**
-
-![CI](https://img.shields.io/github/actions/workflow/status/nishanth-kkj9/format-shift/ci.yml?branch=main&label=CI)
-![Coverage](https://img.shields.io/codecov/c/github/nishanth-kkj9/format-shift)
-![License](https://img.shields.io/github/license/nishanth-kkj9/format-shift)
-![Node](https://img.shields.io/badge/node-%3E%3D22-green)
+**Private by default · Batch processing · Live previews · Conversion history · ZIP downloads**
 
 </div>
 
+<p align="center">
+  <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/nishanth-kkj9/format-shift/ci.yml?branch=main&label=CI">
+  <img alt="Coverage" src="https://img.shields.io/codecov/c/github/nishanth-kkj9/format-shift">
+  <img alt="License" src="https://img.shields.io/github/license/nishanth-kkj9/format-shift">
+  <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D22-green">
+</p>
+
 ---
 
-## What is FormatShift?
+## Table of Contents
 
-FormatShift is a full-stack file conversion application designed around a **hybrid conversion architecture**:
-
-1. A user drops one or more files into the browser.
-2. FormatShift detects the file category and source format automatically.
-3. Conversions that the browser can reliably perform stay **client-side** using Canvas, Web Audio, and browser APIs.
-4. Formats that need `ffmpeg` are sent to the local/server API and processed with the resolved ffmpeg binary (system `ffmpeg`, or the bundled `ffmpeg-static` fallback in dev).
-5. The converted result is returned to the browser for preview and download.
-
-This approach reduces unnecessary uploads while still supporting media formats that browser APIs cannot reliably encode.
-
-> **Privacy note:** browser-side conversions do not need to upload the source file. Server-side conversions necessarily send the selected file to the FormatShift API for processing. On the bundled server, uploaded files are written to a temporary directory and cleaned up after the request.
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Supported Formats](#-supported-formats)
+- [Getting Started](#-getting-started)
+- [API Reference](#-api-reference)
+- [Security & Resource Handling](#-security--resource-handling)
+- [Testing & CI](#-testing--ci)
+- [Docker](#-docker)
+- [Project Structure](#-project-structure)
+- [Roadmap](#-roadmap)
+- [License](#-license)
 
 ---
 
@@ -38,64 +40,59 @@ This approach reduces unnecessary uploads while still supporting media formats t
 ### Conversion
 
 - **Batch conversion** — queue multiple files and convert them together.
-- **Automatic format detection** — identifies image, audio, video, data, and document categories from the file type/extension.
-- **Per-file target format** — each queued file can have its own output format.
-- **Global target format** — apply one compatible target format to multiple queued files.
+- **Automatic format detection** — identifies image, audio, video, data, and document categories from file type and extension.
+- **Per-file & global target formats** — set an output format per file or apply one target across the queue.
 - **Browser-first processing** — common conversions run locally without an API upload.
 - **FFmpeg fallback** — server-side processing for formats that need native codecs.
-- **Video → audio extraction** — extract MP3/WAV and other supported audio formats from video.
+- **Video → audio extraction** — extract MP3, WAV, OGG, AAC, M4A, and FLAC from video.
+- **Code templates** — generate source-aware Python, Node.js, and HTML examples via the API.
 
-### Image tools
+### Image Tools
 
-- PNG, JPG/JPEG, WEBP, GIF, BMP, ICO, SVG and AVIF targets in the UI.
-- Quality control.
-- Maximum width/height resizing.
-- Aspect-ratio preservation.
-- Rotation and horizontal/vertical flipping.
-- Grayscale conversion.
-- Background color handling.
-- Social-media presets.
-- Favicon preset at 32×32.
+| Capability | Description                                                  |
+| ---------- | ------------------------------------------------------------ |
+| Formats    | PNG, JPG/JPEG, WEBP, GIF, BMP, ICO, SVG, AVIF                |
+| Quality    | Configurable output quality (1–100)                          |
+| Resize     | Max width/height with aspect-ratio preservation              |
+| Transform  | Rotation (0/90/180/270), horizontal/vertical flip, grayscale |
+| Presets    | Social-media sizes and 32×32 favicon                         |
 
-### Audio tools
+### Audio Tools
 
-- MP3, WAV, OGG, AAC, M4A and FLAC targets.
-- Bitrate selection.
-- Sample-rate selection.
-- Mono/stereo selection.
-- Volume adjustment.
-- Start/end trimming.
+| Capability  | Description                                    |
+| ----------- | ---------------------------------------------- |
+| Formats     | MP3, WAV, OGG, AAC, M4A, FLAC                  |
+| Bitrate     | 128k – 320k                                    |
+| Sample rate | 8k – 96kHz                                     |
+| Channels    | Mono / Stereo                                  |
+| Effects     | Volume adjustment (0–200%), start/end trimming |
 
-### Video tools
+### Video Tools
 
-- MP4, WEBM, GIF, MOV, MKV and AVI targets.
-- 360p, 480p, 720p and 1080p presets.
-- FPS selection.
-- Video-to-audio extraction.
+| Capability  | Description                              |
+| ----------- | ---------------------------------------- |
+| Formats     | MP4, WEBM, GIF, MOV, MKV, AVI            |
+| Resolutions | 360p, 480p, 720p, 1080p, original        |
+| FPS         | 1 – 120                                  |
+| Extraction  | Video → audio (MP3/WAV/OGG/AAC/M4A/FLAC) |
 
-### Data & document tools
+### Data & Document Tools
 
-- JSON, CSV, TSV, XML and YAML conversions.
-- JSON ↔ CSV/TSV/XML/YAML transformations.
+- JSON, CSV, TSV, XML, and YAML conversions.
 - RFC-4180 CSV/TSV parsing with quoted-field and multiline handling.
 - Markdown/text → HTML conversion.
-- Plain-text, Markdown and HTML document targets (all browser-side).
-
-> **Current implementation note:** data/document conversion is text-based and browser-side. There is no PDF rendering or generation engine, so PDF is **not** supported as an input _or_ output — asking for a PDF target returns an explicit "unsupported" error rather than a fake file.
+- PDF is **not** supported as input or output — requests return an explicit error rather than a fake file.
 
 ### UX
 
-- Drag-and-drop upload queue.
-- Per-file conversion progress.
+- Drag-and-drop upload queue with per-file progress.
 - Live image/audio/video previews.
 - Conversion options modal.
-- Conversion history persisted in `localStorage`.
-- Re-download from history.
+- History persisted in `localStorage` with re-download.
 - Batch ZIP download.
-- Code snippets for Python, Node.js and browser JavaScript.
-- Dark/light theme support.
-- Lazy-loaded heavy modal components to reduce the initial frontend bundle.
-- Object URL cleanup to reduce preview memory leaks.
+- Dark/light theme.
+- Lazy-loaded heavy modal components to keep the initial bundle small.
+- Object URL cleanup to prevent preview memory leaks.
 
 ---
 
@@ -125,46 +122,42 @@ This approach reduces unnecessary uploads while still supporting media formats t
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-### Client-side path
+### Client-Side Path
 
 The frontend contains category-specific conversion modules:
 
 - `convertImage.ts` — HTML5 Canvas image processing.
-- `convertAudio.ts` — Web Audio API decoding, trimming, gain, resampling and WAV encoding.
+- `convertAudio.ts` — Web Audio API decoding, trimming, gain, resampling, and WAV encoding.
 - `convertVideo.ts` — browser video/canvas processing where supported.
 - `convertData.ts` — JSON/CSV/TSV/XML/YAML/text transformations.
 
-### Server-side path
+All targets are defined **once** in `src/core/conversionRegistry.ts`; the UI, detection, server endpoint, and code templates all derive from it, so the app never advertises a conversion it cannot genuinely perform.
 
-The Express API handles conversions requiring FFmpeg:
+### Server-Side Path
 
-- `server/upload.ts` streams multipart files to temporary storage instead of buffering the complete upload in memory, writes to a randomized temp filename (never the client-provided name) and keeps the original name separately.
-- `server/ffmpeg/` contains the FFmpeg pipeline: `runner.ts` (spawns ffmpeg, writes to a seekable temp file, kills the child on client disconnect), `filters.ts` (image), `audio.ts` (audio encode / video→audio), `video.ts` (container conversion).
-- `server/convert.ts` orchestrates the pipeline and derives allowed targets from the shared conversion registry.
-- `server/routes/convert.ts` streams the result back to the client and cleans up temp files after the request.
-- `server/routes/templates.ts` generates code examples only for conversions the registry actually supports.
-
-The upload layer also performs category-specific size checks and best-effort magic-byte MIME validation before conversion.
+- `server/upload.ts` — streams multipart files to randomized temp filenames with strict pre-file category validation.
+- `server/ffmpeg/` — the FFmpeg pipeline: runner, filters (image), audio, video.
+- `server/convert.ts` — orchestrates the pipeline and derives allowed targets from the shared registry.
+- `server/routes/convert.ts` — streams results back and cleans up temp files.
+- `server/routes/templates.ts` — generates source-aware code examples.
 
 ---
 
 ## 📦 Supported Formats
 
-All targets below are defined once in `src/core/conversionRegistry.ts`; the UI, detection, server endpoint and code templates all derive from it. No conversion is advertised that the app cannot genuinely perform.
+| Category     | Targets                                          | Browser engine            | Server (FFmpeg) engine                             |
+| ------------ | ------------------------------------------------ | ------------------------- | -------------------------------------------------- |
+| **Image**    | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF   | JPG, JPEG, PNG, WEBP, SVG | GIF, BMP, ICO, AVIF (+ any browser target via API) |
+| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC                    | WAV                       | MP3, OGG, AAC, M4A, FLAC                           |
+| **Video**    | MP4, WEBM, MOV, MKV, AVI, GIF + audio extraction | —                         | All                                                |
+| **Data**     | JSON, CSV, TSV, XML, YAML                        | All                       | —                                                  |
+| **Document** | TXT, MD, HTML                                    | All                       | —                                                  |
 
-| Category     | Targets                                                      | Browser engine                          | Server (FFmpeg) engine                               |
-| ------------ | ------------------------------------------------------------ | --------------------------------------- | ---------------------------------------------------- |
-| **Image**    | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF               | JPG, JPEG, PNG, WEBP, SVG               | GIF, BMP, ICO, AVIF (and any browser target via API) |
-| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC                                | WAV                                     | MP3, OGG, AAC, M4A, FLAC                             |
-| **Video**    | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server)                          | All                                                  |
-| **Data**     | JSON, CSV, TSV, XML, YAML                                    | All                                     | —                                                    |
-| **Document** | TXT, MD, HTML                                                | All (TXT/MD/HTML accepted as _sources_) | —                                                    |
-
-### Server upload limits
+### Server Upload Limits
 
 Server-side uploads are limited by category:
 
-| Category | Maximum upload size |
+| Category | Maximum Upload Size |
 | -------- | ------------------: |
 | Image    |               50 MB |
 | Audio    |              100 MB |
@@ -172,41 +165,7 @@ Server-side uploads are limited by category:
 | Document |               10 MB |
 | Data     |               10 MB |
 
-The multipart parser also has an overall 200 MB Busboy file-size limit.
-
----
-
-## 🛠️ Tech Stack
-
-### Frontend
-
-- React 19
-- TypeScript 5.8
-- Vite 8
-- Tailwind CSS 4
-- Motion
-- Lucide React
-- Canvas / Web Audio / browser media APIs
-
-### Backend
-
-- Node.js 22+
-- Express 5
-- TypeScript
-- `tsx`
-- `ffmpeg-static`
-- Busboy
-- `file-type`
-- `express-rate-limit`
-
-### Utilities / Build
-
-- esbuild
-- Vitest
-- JSZip
-- Concurrently
-- Docker support
-- GitHub Actions CI
+The multipart parser also enforces an overall **200 MB** Busboy file-size limit as defense-in-depth.
 
 ---
 
@@ -218,17 +177,15 @@ The multipart parser also has an overall 200 MB Busboy file-size limit.
 - npm
 - A modern browser with Canvas/Web Audio/media API support
 
-The application uses `ffmpeg-static` for server-side conversion, so a separate system FFmpeg installation is normally **not required**.
+The app uses `ffmpeg-static` as a dev-time fallback, so a system FFmpeg is **not required** for local development.
 
-### Install
+### Install & Run
 
 ```bash
 git clone https://github.com/nishanth-kkj9/format-shift.git
 cd format-shift
 npm install
 ```
-
-### Development
 
 Run frontend and API together:
 
@@ -239,65 +196,55 @@ npm run dev:all
 Or run them separately:
 
 ```bash
-npm run dev
+npm run dev      # Vite dev server → http://localhost:5173
+npm run server   # Express API      → http://localhost:4000
 ```
 
-```bash
-npm run server
-```
+### NPM Scripts
 
-Default development endpoints:
-
-- Frontend: `http://localhost:5173`
-- API: `http://localhost:4000`
-- Health check: `http://localhost:4000/api/health`
-
-### Environment
-
-The repository includes `.env.example` for environment configuration. Copy it to `.env` when environment variables are required by your deployment.
+| Command                | Purpose                                                      |
+| ---------------------- | ------------------------------------------------------------ |
+| `npm run dev`          | Start the Vite development server                            |
+| `npm run server`       | Start the Express API with `tsx`                             |
+| `npm run dev:all`      | Start Vite and Express together                              |
+| `npm run build`        | Build the frontend and bundle the API into `dist/server.cjs` |
+| `npm start`            | Start the production server                                  |
+| `npm run preview`      | Preview the Vite production build                            |
+| `npm run typecheck`    | TypeScript type-check (`tsc --noEmit`)                       |
+| `npm run lint`         | ESLint                                                       |
+| `npm run format:check` | Prettier check                                               |
+| `npm test`             | Run the Vitest test suite                                    |
+| `npm run test:e2e`     | Build + Playwright end-to-end tests                          |
 
 ---
 
-## 📜 NPM Scripts
+## 🔌 API Reference
 
-| Command           | Purpose                                                      |
-| ----------------- | ------------------------------------------------------------ |
-| `npm run dev`     | Start the Vite development server                            |
-| `npm run server`  | Start the Express API with `tsx`                             |
-| `npm run dev:all` | Start Vite and Express together                              |
-| `npm run build`   | Build the frontend and bundle the API into `dist/server.cjs` |
-| `npm start`       | Start the production server                                  |
-| `npm run preview` | Preview the Vite production build                            |
-| `npm run lint`    | TypeScript type-check with `tsc --noEmit`                    |
-| `npm test`        | Run the Vitest test suite                                    |
-| `npm run clean`   | Remove generated build output                                |
-
----
-
-## 🔌 API
-
-### Health check
+### Health Check
 
 ```http
 GET /api/health
 ```
 
-Example response:
+Returns status, app name, timestamp, and FFmpeg concurrency metrics.
 
-```json
-{
-  "status": "ok",
-  "app": "FormatShift Universal Converter",
-  "timestamp": "2026-08-14T00:00:00.000Z"
-}
+### Readiness
+
+```http
+GET /api/ready
 ```
 
-### Convert a file
+Reports whether the resolved FFmpeg binary meets the configured feature floor (`FFMPEG_MIN_FEATURE_VERSION`) and security-patch floor (`FFMPEG_MIN_SECURITY_VERSION`). Returns `200` when ready, `503` otherwise.
+
+### Convert a File
 
 ```http
 POST /api/convert
 Content-Type: multipart/form-data
+X-Category: image|audio|video|document|data
 ```
+
+Because per-category upload caps must be selected **before** the multipart file bytes arrive, every request must include a valid category in pre-file metadata — either the `X-Category` header **or** the `?category=` query parameter. Missing, unknown, or mutually conflicting header/query categories are rejected with `400` before any file bytes are accepted.
 
 Multipart fields:
 
@@ -309,28 +256,16 @@ Multipart fields:
 | `targetFormat` | Yes      | Requested output format                          |
 | `options`      | Optional | JSON-encoded conversion options                  |
 
-Successful responses return the converted binary with an appropriate `Content-Type` and an attachment filename.
+Successful responses return the converted binary with an appropriate `Content-Type` and an attachment filename. Common client errors return a JSON payload with an `error` message and a `requestId`.
 
-Common client errors return JSON such as:
+The endpoint is rate-limited to **30 requests/minute/IP** plus a **60 req/min** aggregate backstop (both per server process).
 
-```json
-{
-  "error": "Unsupported target format: xyz"
-}
-```
-
-The conversion endpoint is rate-limited to **30 requests per minute per IP**
-(plus a 60 req/min aggregate backstop across all clients) by default. Both
-limits are per server process; see the Security section for scaling semantics.
-
-### Code templates
+### Code Templates
 
 ```http
 POST /api/code-template
 Content-Type: application/json
 ```
-
-Example request:
 
 ```json
 {
@@ -340,61 +275,75 @@ Example request:
 }
 ```
 
-The response contains generated examples for:
+Returns source-aware Python, Node.js, and HTML examples. JSON sources generate JSON-parsing snippets; CSV/TSV sources generate delimiter-aware CSV/TSV parsing snippets.
 
-- Python
-- Node.js
-- HTML/JavaScript
+---
+
+## 🔐 Security & Resource Handling
+
+FormatShift is built with a defense-in-depth posture for file-processing workloads:
+
+- **Streaming uploads** — multipart files are streamed to randomized temp filenames, never buffered fully in memory.
+- **Fail-closed category contract** — per-category caps are enforced during streaming; missing/unknown/conflicting pre-file metadata is rejected with `400` before bytes are accepted.
+- **Magic-byte validation** — file signatures are checked with `file-type` for binary categories; `application/octet-stream` cannot bypass allowlists.
+- **Strict option allowlist** — the convert API accepts only known option keys (Zod `.strict()`). Unknown keys such as `-map` are rejected, never forwarded to FFmpeg.
+- **FFmpeg safety** — a bounded concurrency semaphore + queue (over capacity → `503`), a hard timeout (`504`), and output-size caps (`413`), with cleanup on success, error, and client disconnect.
+- **FFmpeg version policy** — `/api/ready` verifies both a feature floor and a security-patch floor (defaults `4.2.0` / `5.1.9`).
+- **Header hardening** — served via Helmet with CSP, `X-Frame-Options: DENY`, `nosniff`, and strict referrer policy.
+- **Sanitized errors** — FFmpeg stderr is stripped of absolute paths and memory addresses; every error carries a `requestId`.
+- **Container hardening** — the Docker image runs as a **non-root** user and pins immutable GitHub Action SHAs in CI.
+
+> **Deployment note:** rate limits use an in-process store, so they are per server process. The shipped deployment is a single container where the quotas hold exactly as documented. If you scale to multiple replicas, move rate limiting to a shared store (e.g., Redis) first.
 
 ---
 
 ## 🧪 Testing & CI
 
-FormatShift includes unit and integration tests using Vitest.
+The repository ships a substantial automated test suite:
 
-The integration suite covers important server behavior including:
+- **Unit tests** — conversion option validation, FFmpeg argument builders, image/audio/video filters, upload parsing.
+- **Integration tests** — real streamed PNG/audio/video conversions through the Express app, per-category size limits, magic-byte rejection, temp-file cleanup, code-template source-awareness, and environment-config enforcement.
+- **E2E tests** — Playwright browser coverage.
 
-- Successful streamed PNG conversion.
-- Rejection of binary content whose magic bytes do not match the requested category.
-- Invalid image data handling.
-- Per-category upload size limits.
-- Temporary-file cleanup after conversion.
+### CI Pipeline (GitHub Actions)
 
-Run locally:
+| Job                | Steps                                                                |
+| ------------------ | -------------------------------------------------------------------- |
+| **quality**        | `npm ci`, lockfile drift check, typecheck, lint, format check, build |
+| **test**           | Full Vitest suite with V8 coverage → Codecov                         |
+| **security-audit** | `npm audit --audit-level=high`                                       |
+| **docker**         | Multi-stage image build + Trivy scan for HIGH/CRITICAL               |
+
+Releases are published from a separate `docker-release.yml` workflow: on a `v*` tag push it builds and pushes `ghcr.io/<owner>/format-shift` for `linux/amd64` and `linux/arm64`, and creates a GitHub Release with auto-generated notes.
+
+Run the full local validation:
 
 ```bash
+npm run typecheck
 npm run lint
-npm test
+npm run format:check
 npm run build
+npm test
+npm run test:e2e
 ```
-
-GitHub Actions runs the same type-check, test, and build pipeline on pushes to `main` and pull requests.
 
 ---
 
 ## 🐳 Docker
 
-A multi-stage Dockerfile is included.
-
-Build:
-
 ```bash
 docker build -t formatshift .
-```
-
-Run:
-
-```bash
 docker run --rm -p 4000:4000 formatshift
 ```
 
-Then open:
+Then open `http://localhost:4000`.
 
-```text
-http://localhost:4000
-```
+The production image:
 
-The production image uses Node 22 slim and installs runtime dependencies separately from development dependencies.
+- Uses `node:22-slim` with system FFmpeg (`FFMPEG_PATH=/usr/bin/ffmpeg`) — glibc-compatible, unlike ffmpeg-static's musl binaries.
+- Installs runtime dependencies only (`npm ci --omit=dev`) and drops the npm CLI to reduce CVE surface.
+- Runs as a non-root `app` user.
+- Exposes a healthcheck against `/api/ready`.
 
 ---
 
@@ -402,154 +351,44 @@ The production image uses Node 22 slim and installs runtime dependencies separat
 
 ```text
 format-shift/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
+├── .github/workflows/
+│   ├── ci.yml              # quality, test, audit, docker + trivy
+│   └── docker-release.yml  # GHCR publish on v* tags (amd64 + arm64)
+├── e2e/                    # Playwright end-to-end tests
 ├── server/
-│   ├── convert.ts
-│   ├── convert.test.ts
-│   ├── e2e-server.mjs
-│   ├── integration.test.ts
-│   ├── upload.ts
+│   ├── main.ts             # entry point (tsx dev / bundled prod)
+│   ├── app.ts              # Express app assembly (helmet, rate limits)
+│   ├── config.ts           # Zod-validated environment config
+│   ├── convert.ts          # conversion orchestration + option validation
+│   ├── upload.ts           # streaming multipart parser (fail-closed)
 │   ├── ffmpeg/
-│   │   ├── audio.ts
-│   │   ├── filters.ts
-│   │   ├── runner.ts
-│   │   └── video.ts
+│   │   ├── runner.ts       # semaphore, queue, timeout, output caps
+│   │   ├── audio.ts        # audio encode / video→audio args
+│   │   ├── video.ts        # container conversion args
+│   │   └── filters.ts      # image filter args
 │   └── routes/
-│       ├── convert.ts
-│       └── templates.ts
+│       ├── convert.ts      # /api/convert streaming response
+│       └── templates.ts    # /api/code-template source-aware snippets
 ├── src/
-│   ├── core/
-│   │   ├── conversionRegistry.ts
-│   │   └── conversionRegistry.test.ts
-│   ├── components/
-│   │   ├── BatchBar.tsx
-│   │   ├── CodeSnippetModal.tsx
-│   │   ├── ConversionOptionsModal.tsx
-│   │   ├── Dropzone.tsx
-│   │   ├── FileList.tsx
-│   │   ├── FormatDropdown.tsx
-│   │   ├── FormatGuide.tsx
-│   │   ├── Header.tsx
-│   │   ├── HistoryDrawer.tsx
-│   │   └── PreviewModal.tsx
-│   ├── utils/
-│   │   ├── convertAudio.ts
-│   │   ├── convertData.ts
-│   │   ├── convertImage.ts
-│   │   ├── convertVideo.ts
-│   │   ├── serverConvert.ts
-│   │   ├── detect.ts
-│   │   ├── metadata.ts
-│   │   └── converter.ts
+│   ├── core/conversionRegistry.ts   # single source of truth for targets
+│   ├── components/         # Dropzone, FileList, modals, drawers…
+│   ├── hooks/              # shared hooks (e.g. useDialogFocus)
+│   ├── utils/              # convertImage/Audio/Video/Data, serverConvert
+│   ├── types.ts
 │   ├── App.tsx
-│   ├── index.css
-│   ├── main.tsx
-│   └── types.ts
+│   └── main.tsx
 ├── Dockerfile
-├── index.html
 ├── package.json
-├── server.ts
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
 ---
 
-## 🔐 Security & Resource Handling
-
-The server includes several safeguards for file-processing workloads:
-
-- Multipart uploads are streamed to temporary files rather than fully buffered in RAM.
-- Per-category file-size limits are enforced.
-- File signatures are checked with `file-type` when a binary signature is available.
-- The conversion API is rate-limited.
-- Temporary upload and FFmpeg output directories are cleaned up after processing.
-- Browser object URLs are revoked during application cleanup to reduce memory retention.
-
-### Important production considerations
-
-FormatShift is a file-processing application, so a public deployment should still be hardened for its expected traffic and threat model. Consider adding authentication or quotas, stronger request timeouts, reverse-proxy limits, structured logging, observability, stricter content validation, and isolated conversion workers before exposing a high-volume instance to untrusted users.
-
----
-
-## ⚠️ Current Limitations
-
-- Browser codec support varies by browser and operating system.
-- Browser `canvas.toBlob()` encoders that are unavailable now surface a clear error (and the image may be retried on the server API) rather than silently returning a PNG.
-- Large client-side media conversions can consume significant browser memory.
-- Server-side FFmpeg conversions consume CPU and temporary disk space.
-- The document pipeline is text-based, not a full office/PDF conversion engine; PDF is rejected as an input and never advertised as an output.
-- Conversion options are category-specific and not every UI option applies to every output format.
-- Code templates are illustrative snippets, not a guarantee that every generated snippet supports every FormatShift option.
-
----
-
-## 🗺️ Suggested Roadmap
-
-- [ ] Add a real PDF generation/rendering pipeline.
-- [ ] Add richer document conversions such as DOCX/ODT.
-- [ ] Add conversion job IDs and asynchronous server workers for large files.
-- [ ] Add configurable server storage/cleanup policies.
-- [ ] Add Playwright end-to-end browser tests.
-- [ ] Add performance benchmarks for large media files.
-- [ ] Add authentication, quotas, and per-user limits for public deployments.
-- [ ] Add downloadable conversion reports/metadata.
-
----
-
-## 🔒 Security
-
-Security fixes are a priority. Please report vulnerabilities privately instead
-of opening a public issue so they can be fixed before disclosure.
-
-- **Header hardening:** served via `helmet` with a Content Security Policy.
-  `X-Frame-Options: DENY`, `nosniff`, and a strict referrer policy are applied
-  to every response.
-- **HSTS:** opt-in via `ENABLE_HSTS=1`. Only enable it when the site is served
-  over HTTPS (usually behind a TLS-terminating proxy).
-- **Reverse proxies:** set `TRUST_PROXY=1` only when behind a trusted proxy
-  (nginx, Cloudflare). Otherwise the server may trust spoofed `X-Forwarded-For`
-  headers.
-- **Rate limiting:** per-IP (30 req/min) and a global aggregate backstop
-  (60 req/min) on `/api/convert`, so a distributed burst cannot exhaust every
-  ffmpeg slot. Both limits are enforced by an in-process store, so they are
-  **per server process**: the shipped deployment runs a single container, where
-  the quotas hold exactly as documented. If the app is ever scaled to multiple
-  replicas, the aggregate backstop multiplies by replica count — move it to a
-  shared store (e.g. Redis) before adopting horizontal scaling.
-- **Option allowlist:** the convert API accepts only known option keys (zod
-  `.strict()`). Unknown keys such as `-map` are rejected, never forwarded to
-  ffmpeg.
-- **ffmpeg safety:** each job gets a fresh temp dir, a bounded concurrency
-  semaphore + queue (over capacity → HTTP 503), a hard timeout, and cleanup on
-  success, error, and client disconnect. Error messages are sanitized (no
-  absolute paths, no memory addresses).
-- **ffmpeg version policy:** `/api/ready` and `/api/health` check the resolved
-  binary against a feature floor (`FFMPEG_MIN_FEATURE_VERSION`, default 4.2.0)
-  and a patch-freshness floor (`FFMPEG_MIN_SECURITY_VERSION`, default 5.1.9, the
-  security-patched baseline in the node:22-slim Docker image). An older, unpatched
-  binary makes readiness report 503. Both values must be `major.minor.patch`
-  strings.
-- **Downloads:** converted files are served with
-  `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so
-  converted SVG/HTML can never be rendered inline.
-- **Container:** the Docker image runs as a non-root user and exposes a
-  healthcheck.
-- **Temp files:** uploaded files are written to a temporary directory and
-  removed after each request.
-
----
-
-## 📄 License
+## License
 
 Released under the [MIT License](LICENSE).
 
----
-
 ## 👤 Author
 
-Built by **Nishanth Kkj9**.
-
-Repository: https://github.com/nishanth-kkj9/format-shift
+Built by **Nishanth Kkj9** · [format-shift](https://github.com/nishanth-kkj9/format-shift)
