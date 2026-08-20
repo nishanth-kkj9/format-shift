@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "test-visualizer*.mjs", "coverage"] },
+  { ignores: ["dist", "node_modules", "coverage"] },
   {
     files: ["**/*.{ts,tsx}"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
@@ -13,7 +13,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
       // Noisy rules inherited from recommended that fire on pre-existing code.
       // Kept off until the codebase is migrated deliberately rather than via
-      // blind --fix (the visualizer engine is intentionally hand-tuned).
+      // blind --fix.
       "@typescript-eslint/no-explicit-any": "off",
       "prefer-const": "off",
       "no-useless-assignment": "off",

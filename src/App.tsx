@@ -210,19 +210,13 @@ export default function App() {
     setQueue((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
-        // Spectrum visualizer outputs a video — force a video target so routing + extension match.
-        const isSpectrum = item.category === "audio" && updatedOptions.audio?.spectrumVisualizer;
         // Social presets are for posting; social platforms want a single raster
         // format, so a preset pins the target to jpg.
         const isPreset =
           item.category === "image" &&
           updatedOptions.image?.socialPreset &&
           updatedOptions.image.socialPreset !== "custom";
-        const targetFormat = isPreset
-          ? "jpg"
-          : isSpectrum && item.targetFormat !== "webm"
-            ? "mp4"
-            : item.targetFormat;
+        const targetFormat = isPreset ? "jpg" : item.targetFormat;
         return { ...item, options: updatedOptions, targetFormat };
       })
     );
@@ -260,19 +254,13 @@ export default function App() {
     abortController.signal.addEventListener("abort", handleAbort);
 
     try {
-      // Spectrum visualizer always produces a video, regardless of the queued target.
-      const effectiveTarget: TargetFormat =
-        item.category === "audio" && item.options.audio?.spectrumVisualizer && item.targetFormat !== "webm"
-          ? "mp4"
-          : item.targetFormat;
-
-      if (needsServerConversion(item.category, effectiveTarget)) {
+      if (needsServerConversion(item.category, item.targetFormat)) {
         updateProgress(30);
         resultBlob = await convertServerSide(
           item.file,
           item.category,
           item.originalExtension,
-          effectiveTarget,
+          item.targetFormat,
           item.options,
           abortController.signal
         );
@@ -290,7 +278,7 @@ export default function App() {
       } else if (item.category === "audio") {
         const res = await convertAudio(
           item.file,
-          effectiveTarget,
+          item.targetFormat,
           item.options.audio!,
           updateProgress,
           abortController.signal
@@ -321,7 +309,7 @@ export default function App() {
       const convertedUrl = URL.createObjectURL(resultBlob);
       queueUrlsRef.current.add(convertedUrl);
       const nameWithoutExt = item.name.substring(0, item.name.lastIndexOf(".")) || item.name;
-      const actualExt = extensionForMime(resultBlob.type) || effectiveTarget;
+      const actualExt = extensionForMime(resultBlob.type) || item.targetFormat;
       const convertedName = `${nameWithoutExt}_converted.${actualExt}`;
 
       // Update item in queue as completed
@@ -350,7 +338,7 @@ export default function App() {
         convertedName,
         category: item.category,
         sourceFormat: item.originalExtension,
-        targetFormat: effectiveTarget,
+        targetFormat: item.targetFormat,
         originalSize: item.originalSize,
         convertedSize: resultBlob.size,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),

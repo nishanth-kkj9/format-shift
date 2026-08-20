@@ -10,7 +10,6 @@ export interface TargetCapabilities {
   resize?: boolean;
   preview?: boolean;
   audioExtract?: boolean;
-  visualizer?: boolean;
 }
 
 export interface TargetSpec {
@@ -91,19 +90,6 @@ const AUDIO_TARGETS: Record<string, TargetSpec> = {
   aac: { format: "aac", mime: "audio/aac", engine: "server", capabilities: { quality: true, preview: true } },
   m4a: { format: "m4a", mime: "audio/mp4", engine: "server", capabilities: { quality: true, preview: true } },
   flac: { format: "flac", mime: "audio/flac", engine: "server", capabilities: { preview: true } },
-  // audio -> spectrum visualizer videos are produced client-side
-  mp4: {
-    format: "mp4",
-    mime: "video/mp4",
-    engine: "browser",
-    capabilities: { visualizer: true, preview: true },
-  },
-  webm: {
-    format: "webm",
-    mime: "video/webm",
-    engine: "browser",
-    capabilities: { visualizer: true, preview: true },
-  },
 };
 
 const VIDEO_TARGETS: Record<string, TargetSpec> = {

@@ -44,7 +44,6 @@ This approach reduces unnecessary uploads while still supporting media formats t
 - **Browser-first processing** — common conversions run locally without an API upload.
 - **FFmpeg fallback** — server-side processing for formats that need native codecs.
 - **Video → audio extraction** — extract MP3/WAV and other supported audio formats from video.
-- **Audio spectrum video** — create audio visualizer videos from audio files.
 
 ### Image tools
 
@@ -66,7 +65,6 @@ This approach reduces unnecessary uploads while still supporting media formats t
 - Mono/stereo selection.
 - Volume adjustment.
 - Start/end trimming.
-- Audio spectrum visualizer with multiple visual styles/themes.
 
 ### Video tools
 
@@ -74,7 +72,6 @@ This approach reduces unnecessary uploads while still supporting media formats t
 - 360p, 480p, 720p and 1080p presets.
 - FPS selection.
 - Video-to-audio extraction.
-- Audio spectrum video generation from audio input.
 
 ### Data & document tools
 
@@ -136,7 +133,6 @@ The frontend contains category-specific conversion modules:
 - `convertAudio.ts` — Web Audio API decoding, trimming, gain, resampling and WAV encoding.
 - `convertVideo.ts` — browser video/canvas processing where supported.
 - `convertData.ts` — JSON/CSV/TSV/XML/YAML/text transformations.
-- `audioVisualizer.ts` — spectrum visualization/video generation.
 
 ### Server-side path
 
@@ -159,7 +155,7 @@ All targets below are defined once in `src/core/conversionRegistry.ts`; the UI, 
 | Category     | Targets                                                      | Browser engine                          | Server (FFmpeg) engine                               |
 | ------------ | ------------------------------------------------------------ | --------------------------------------- | ---------------------------------------------------- |
 | **Image**    | JPG, JPEG, PNG, WEBP, SVG, GIF, BMP, ICO, AVIF               | JPG, JPEG, PNG, WEBP, SVG               | GIF, BMP, ICO, AVIF (and any browser target via API) |
-| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC, MP4, WEBM                     | WAV, MP4/WEBM (spectrum visualizer)     | MP3, OGG, AAC, M4A, FLAC                             |
+| **Audio**    | WAV, MP3, OGG, AAC, M4A, FLAC                                | WAV                                     | MP3, OGG, AAC, M4A, FLAC                             |
 | **Video**    | MP4, WEBM, MOV, MKV, AVI, GIF, MP3, WAV, OGG, AAC, FLAC, M4A | — (all server)                          | All                                                  |
 | **Data**     | JSON, CSV, TSV, XML, YAML                                    | All                                     | —                                                    |
 | **Document** | TXT, MD, HTML                                                | All (TXT/MD/HTML accepted as _sources_) | —                                                    |
@@ -323,7 +319,9 @@ Common client errors return JSON such as:
 }
 ```
 
-The conversion endpoint is rate-limited to **30 requests per minute per IP** by default.
+The conversion endpoint is rate-limited to **30 requests per minute per IP**
+(plus a 60 req/min aggregate backstop across all clients) by default. Both
+limits are per server process; see the Security section for scaling semantics.
 
 ### Code templates
 
@@ -437,7 +435,6 @@ format-shift/
 │   │   ├── HistoryDrawer.tsx
 │   │   └── PreviewModal.tsx
 │   ├── utils/
-│   │   ├── audioVisualizer.ts
 │   │   ├── convertAudio.ts
 │   │   ├── convertData.ts
 │   │   ├── convertImage.ts
@@ -517,7 +514,11 @@ of opening a public issue so they can be fixed before disclosure.
   headers.
 - **Rate limiting:** per-IP (30 req/min) and a global aggregate backstop
   (60 req/min) on `/api/convert`, so a distributed burst cannot exhaust every
-  ffmpeg slot.
+  ffmpeg slot. Both limits are enforced by an in-process store, so they are
+  **per server process**: the shipped deployment runs a single container, where
+  the quotas hold exactly as documented. If the app is ever scaled to multiple
+  replicas, the aggregate backstop multiplies by replica count — move it to a
+  shared store (e.g. Redis) before adopting horizontal scaling.
 - **Option allowlist:** the convert API accepts only known option keys (zod
   `.strict()`). Unknown keys such as `-map` are rejected, never forwarded to
   ffmpeg.

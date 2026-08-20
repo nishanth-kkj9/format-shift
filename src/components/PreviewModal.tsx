@@ -19,10 +19,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
   const [sliderPos, setSliderPos] = useState(50);
   const [convertedText, setConvertedText] = useState<string>("");
 
-  const originalUrl = useMemo(
-    () => item?.previewUrl || (item ? URL.createObjectURL(item.file) : ""),
-    [item]
-  );
+  const originalUrl = useMemo(() => item?.previewUrl || (item ? URL.createObjectURL(item.file) : ""), [item]);
   const convertedUrl = item?.convertedUrl || "";
 
   // Clean up object URLs when component unmounts or item changes
@@ -207,11 +204,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, isOpen, onClos
                         <Music className="w-4 h-4 text-indigo-400" />
                         <span>Converted Audio Output ({item.targetFormat.toUpperCase()})</span>
                       </div>
-                      {item.options.audio?.spectrumVisualizer ? (
-                        <video controls src={convertedUrl} className="w-full rounded-xl" />
-                      ) : (
-                        <audio controls src={convertedUrl} className="w-full h-10 rounded-xl" />
-                      )}
+                      <audio controls src={convertedUrl} className="w-full h-10 rounded-xl" />
                     </div>
                   )}
                 </div>

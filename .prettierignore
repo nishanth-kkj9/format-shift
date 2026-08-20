@@ -3,7 +3,5 @@ node_modules
 coverage
 package-lock.json
 bun.lock
-src/utils/visualizer
-test-visualizer*.mjs
 probe
 *.log

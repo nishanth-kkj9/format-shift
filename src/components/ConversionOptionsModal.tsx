@@ -1,17 +1,7 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useDialogFocus } from "../hooks/useDialogFocus";
-import {
-  X,
-  RotateCw,
-  FlipHorizontal,
-  FlipVertical,
-  Sliders,
-  Check,
-  ShieldCheck,
-  Share2,
-  Activity,
-} from "lucide-react";
+import { X, RotateCw, FlipHorizontal, FlipVertical, Sliders, Check, ShieldCheck, Share2 } from "lucide-react";
 import {
   ConversionItem,
   ImageConversionOptions,
@@ -19,8 +9,6 @@ import {
   VideoConversionOptions,
   DataConversionOptions,
   SocialMediaPreset,
-  SpectrumStyle,
-  SpectrumTheme,
 } from "../types";
 import { SOCIAL_PRESETS } from "../utils/converter";
 
@@ -59,9 +47,6 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
       sampleRate: 44100,
       channels: 2,
       volume: 100,
-      spectrumVisualizer: false,
-      spectrumStyle: "bars",
-      spectrumTheme: "neon-lime",
     }
   );
 
@@ -354,86 +339,6 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
               {/* AUDIO OPTIONS */}
               {item.category === "audio" && (
                 <div className="space-y-5">
-                  {/* Audio Spectrum Visualizer Section */}
-                  <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-indigo-300 flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-indigo-400 animate-pulse" />
-                        Audio Spectrum Video Generator
-                      </label>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={
-                            audioOpts.spectrumVisualizer ||
-                            item.targetFormat === "mp4" ||
-                            item.targetFormat === "webm"
-                          }
-                          onChange={(e) =>
-                            setAudioOpts({ ...audioOpts, spectrumVisualizer: e.target.checked })
-                          }
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                      </label>
-                    </div>
-
-                    <p className="text-[11px] text-slate-300/80 leading-relaxed">
-                      Converts audio into an animated HD video soundwave (`MP4` / `WEBM`) ready for social
-                      media!
-                    </p>
-
-                    {(audioOpts.spectrumVisualizer ||
-                      item.targetFormat === "mp4" ||
-                      item.targetFormat === "webm") && (
-                      <div className="pt-2 grid grid-cols-2 gap-3 border-t border-indigo-500/20">
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                            Visualizer Style
-                          </label>
-                          <select
-                            value={audioOpts.spectrumStyle || "bars"}
-                            onChange={(e) =>
-                              setAudioOpts({
-                                ...audioOpts,
-                                spectrumStyle: e.target.value as SpectrumStyle,
-                              })
-                            }
-                            className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-950 border border-indigo-500/40 text-white cursor-pointer"
-                          >
-                            <option value="bars">📊 Frequency Equalizer Bars</option>
-                            <option value="wave">〰️ Oscilloscope Waveform</option>
-                            <option value="radial">⭕ Radial Soundwave Ring</option>
-                            <option value="particles">✨ Reactive Particle Field</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                            Color Theme
-                          </label>
-                          <select
-                            value={audioOpts.spectrumTheme || "neon-lime"}
-                            onChange={(e) =>
-                              setAudioOpts({
-                                ...audioOpts,
-                                spectrumTheme: e.target.value as SpectrumTheme,
-                              })
-                            }
-                            className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-slate-950 border border-indigo-500/40 text-white cursor-pointer"
-                          >
-                            <option value="neon-lime">🟢 Neon Lime Reactor</option>
-                            <option value="indigo-violet">🔮 Indigo & Violet</option>
-                            <option value="cyan-emerald">💎 Cyan & Emerald</option>
-                            <option value="sunset-fire">🔥 Sunset Fire</option>
-                            <option value="matrix-green">⚡ Matrix Cyber Green</option>
-                            <option value="aurora">🌌 Aurora Borealis</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                     <label className="text-xs font-bold text-slate-200 block">Target Audio Bitrate</label>
                     <div className="grid grid-cols-4 gap-2">
@@ -452,14 +357,6 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                         </button>
                       ))}
                     </div>
-                    {(audioOpts.spectrumVisualizer ||
-                      item.targetFormat === "mp4" ||
-                      item.targetFormat === "webm") && (
-                      <p className="text-[11px] text-slate-300/80 leading-relaxed">
-                        Spectrum video output encodes audio with the browser's native codec (bitrate/sample
-                        rate are set by the browser, not this control).
-                      </p>
-                    )}
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">

@@ -601,12 +601,12 @@ describe("Server-side source conversions (source-format validation)", () => {
     expect(buf.subarray(8, 12).toString("ascii")).toBe("WAVE");
   }, 30000);
 
-  it("rejects audio -> mp4/webm (visualizer targets run client-side)", async () => {
+  it("rejects audio -> mp4/webm (no longer registered audio targets)", async () => {
     for (const target of ["mp4", "webm"]) {
       const res = await postAudio(toneMp3, "tone.mp3", "audio/mpeg", target);
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toMatch(/client-side/i);
+      expect(body.error).toMatch(/Conversion not supported for audio -> (mp4|webm)/);
       expect(typeof body.requestId).toBe("string");
     }
   }, 30000);

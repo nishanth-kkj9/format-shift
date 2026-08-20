@@ -1,10 +1,9 @@
 import { TargetFormat, AudioConversionOptions } from "../types";
-import { convertAudioToSpectrumVideo } from "./audioVisualizer";
 import { planConversion } from "../core/conversionRegistry";
 
-// Browser can only produce WAV (or spectrum visualizer video). Any other audio
-// target (mp3, ogg, aac, m4a, flac) requires the FFmpeg server — throw instead
-// of silently mislabeling a WAV blob as the requested format.
+// Browser can only produce WAV. Any other audio target (mp3, ogg, aac, m4a,
+// flac) requires the FFmpeg server — throw instead of silently mislabeling a
+// WAV blob as the requested format.
 function assertBrowserSupported(targetFormat: TargetFormat): void {
   const plan = planConversion("audio", targetFormat);
   if (plan.supported === false || plan.target.engine !== "browser") {
@@ -136,12 +135,6 @@ export async function convertAudio(
   abortSignal?: AbortSignal
 ): Promise<{ blob: Blob; duration: number }> {
   assertBrowserSupported(targetFormat);
-
-  // If target format is a video format (MP4, WEBM) or user explicitly enabled spectrum visualizer
-  if (targetFormat === "mp4" || targetFormat === "webm" || options.spectrumVisualizer) {
-    const result = await convertAudioToSpectrumVideo(file, targetFormat, options, onProgress, abortSignal);
-    return { blob: result.blob, duration: result.duration };
-  }
 
   // Check for abort before starting
   if (abortSignal?.aborted) {

@@ -73,9 +73,8 @@ describe("convertServerSide", () => {
         volume: 100,
         sampleRate: 44100,
         channels: 2,
-        spectrumVisualizer: true,
-        spectrumStyle: "bars",
-      },
+        unknownClientOnlyKey: true,
+      } as never,
     });
 
     const init = fetchMock.mock.calls[0][1];

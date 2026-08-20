@@ -73,18 +73,6 @@ export const FORMAT_META: Record<FileCategory, Record<string, FormatMetaEntry>> 
     aac: { label: "AAC Audio", badge: "Stream HD", icon: Music, description: "High efficiency audio stream" },
     m4a: { label: "M4A Apple", badge: "Apple AAC", icon: Music, description: "Container for Apple devices" },
     flac: { label: "FLAC Hi-Fi", badge: "Studio", icon: Disc, description: "Lossless compressed audio" },
-    mp4: {
-      label: "MP4 Spectrum Video",
-      badge: "Visualizer",
-      icon: Video,
-      description: "Animated audio spectrum video (MP4)",
-    },
-    webm: {
-      label: "WEBM Spectrum Video",
-      badge: "Visualizer",
-      icon: Video,
-      description: "Animated audio spectrum video (WEBM)",
-    },
   },
   video: {
     mp4: { label: "MP4 Video", badge: "Universal", icon: Video, description: "Standard H.264 video file" },

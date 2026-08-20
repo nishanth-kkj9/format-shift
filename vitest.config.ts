@@ -7,8 +7,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       // The checklist targets the pure-logic conversion/metadata modules and the
-      // server critical path, not the visualizer engine (hand-tuned) or React
-      // components. Gate those files.
+      // server critical path, not React components. Gate those files.
       include: [
         "src/utils/detect.ts",
         "src/utils/metadata.ts",

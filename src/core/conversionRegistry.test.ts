@@ -66,7 +66,7 @@ describe("conversion registry consistency", () => {
     const browserTargets = categories.flatMap((c) =>
       getAvailableTargets(c).filter((t) => !needsServerEngine(c, t))
     );
-    // svg (canvas wrap), wav + spectrum video (web audio), text/doc (string ops)
+    // svg (canvas wrap), wav (web audio), text/doc (string ops)
     expect(browserTargets).toContain("svg");
     expect(browserTargets).toContain("wav");
     expect(browserTargets).toContain("csv");
@@ -78,7 +78,7 @@ describe("conversion registry consistency", () => {
   it("every browser-engine target has a working client implementation", () => {
     const clientFns = {
       image: ["jpg", "jpeg", "png", "webp", "svg"],
-      audio: ["wav", "mp4", "webm"], // mp4/webm = spectrum visualizer
+      audio: ["wav"],
       video: [],
       document: ["txt", "md", "html"],
       data: ["csv", "json", "xml", "yaml", "tsv"],

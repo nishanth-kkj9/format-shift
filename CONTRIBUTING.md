@@ -26,7 +26,8 @@ npm run build
 
 - This is deliberately a small dependency set. Before adding a package, ask
   whether the standard library or a few lines of code covers it.
-- The spectrum visualizer engine (`src/utils/visualizer/`) is hand-tuned.
+- The conversion registry (`src/core/conversionRegistry.ts`) is the single
+  source of truth for which conversions exist and where they run.
   Keep changes surgical and justify them in the PR description.
 - Server-side ffmpeg work goes through the semaphore in
   `server/ffmpeg/runner.ts`; never spawn ffmpeg directly in a route.

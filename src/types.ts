@@ -10,10 +10,6 @@ export type TargetFormat = ImageFormat | AudioFormat | VideoFormat | DocumentFor
 
 export type ConversionStatus = "idle" | "converting" | "completed" | "error";
 
-export type SpectrumStyle = "bars" | "wave" | "radial" | "particles";
-export type SpectrumTheme =
-  "neon-lime" | "indigo-violet" | "cyan-emerald" | "sunset-fire" | "matrix-green" | "aurora";
-
 export type SocialMediaPreset =
   | "custom"
   | "instagram-square"
@@ -44,9 +40,6 @@ export interface AudioConversionOptions {
   volume: number; // 100 = 100%
   trimStart?: number | undefined; // seconds
   trimEnd?: number | undefined; // seconds
-  spectrumVisualizer?: boolean | undefined;
-  spectrumStyle?: SpectrumStyle | undefined;
-  spectrumTheme?: SpectrumTheme | undefined;
 }
 
 export interface VideoConversionOptions {
