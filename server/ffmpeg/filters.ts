@@ -7,9 +7,14 @@ export function imageFilters(opts: ConvertOptions): string[] {
 
   if (opts.grayscale) filters.push("format=gray");
   if (opts.rotation) {
-    // transpose filters: 0=90cw, 1=90ccw, 2=180
-    const t = opts.rotation === 90 ? "0" : opts.rotation === 270 ? "1" : "2";
-    filters.push(`transpose=${t}`);
+    // transpose: 1 = 90° clockwise, 2 = 90° counter-clockwise (270° CW).
+    // 180° is two axis flips (a single transpose can only do 90°).
+    if (opts.rotation === 180) {
+      filters.push("hflip", "vflip");
+    } else {
+      const t = opts.rotation === 90 ? "1" : "2";
+      filters.push(`transpose=${t}`);
+    }
   }
   if (opts.maxWidth || opts.maxHeight) {
     const w = opts.maxWidth ? String(opts.maxWidth) : "-2";
@@ -21,9 +26,7 @@ export function imageFilters(opts: ConvertOptions): string[] {
     // Single-pass palette generation: split the (already scaled) stream, derive
     // a palette from one branch and apply it to the other. Avoids the muxer's
     // default 256-color per-frame quantization, which banding/dithers badly.
-    filters.push(
-      "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5"
-    );
+    filters.push("split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5");
   }
 
   const args: string[] = [];

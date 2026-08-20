@@ -26,9 +26,23 @@ describe("imageFilters", () => {
     expect(result.join(" ")).toContain("format=gray");
   });
 
-  it("adds rotation filter", () => {
-    const result = imageFilters({ targetFormat: "png", category: "image", rotation: 90 });
-    expect(result.join(" ")).toContain("transpose=0");
+  it("maps rotation to the correct transpose/flip filters", () => {
+    // Client canvas rotates clockwise, so the server must match: 90°=CW
+    // (transpose=1), 270°=90° CCW (transpose=2), 180°=two axis flips.
+    // transpose=0 (90° CCW + vertical flip) is NOT a valid mapping: it would
+    // turn a 270° request into a 90° CW rotation.
+    const vf90 = imageFilters({ targetFormat: "png", category: "image", rotation: 90 }).join(" ");
+    const vf180 = imageFilters({ targetFormat: "png", category: "image", rotation: 180 }).join(" ");
+    const vf270 = imageFilters({ targetFormat: "png", category: "image", rotation: 270 }).join(" ");
+    expect(vf90).toContain("transpose=1");
+    expect(vf180).toContain("hflip");
+    expect(vf180).toContain("vflip");
+    expect(vf270).toContain("transpose=2");
+    expect(vf90).not.toContain("transpose=0");
+  });
+
+  it("applies no rotation filter for rotation 0", () => {
+    expect(imageFilters({ targetFormat: "png", category: "image", rotation: 0 })).toEqual([]);
   });
 
   it("adds scale filter for maxWidth", () => {

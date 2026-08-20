@@ -153,14 +153,22 @@ export async function convertImage(
           ctx.fillStyle = options.bgColor || "#0f172a";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Calculate aspect fit scale to center image on canvas
-          const scale = Math.min(canvas.width / width, canvas.height / height);
+          // Fit the rotated footprint so a 90°/270° rotation doesn't overflow the
+          // preset canvas, then draw centered with the same transforms as the
+          // custom-dimension branch (rotate + flip).
+          const rotated = options.rotation === 90 || options.rotation === 270;
+          const fitW = rotated ? height : width;
+          const fitH = rotated ? width : height;
+          const scale = Math.min(canvas.width / fitW, canvas.height / fitH);
           const drawW = width * scale;
           const drawH = height * scale;
-          const drawX = (canvas.width - drawW) / 2;
-          const drawY = (canvas.height - drawH) / 2;
 
-          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          ctx.save();
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate((options.rotation * Math.PI) / 180);
+          ctx.scale(options.flipHorizontal ? -1 : 1, options.flipVertical ? -1 : 1);
+          ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+          ctx.restore();
 
           // Grayscale filter
           if (options.grayscale) {

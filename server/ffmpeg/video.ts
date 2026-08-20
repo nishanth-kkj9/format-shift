@@ -40,6 +40,9 @@ export function videoArgs(opts: ConvertOptions): string[] {
     // Single-pass palette generation (see filters.ts imageFilters): derive a
     // palette from the stream itself, then map through it. stats_mode=diff
     // samples per-frame differences so fast motion keeps its colors.
+    // ponytail: single-pass buffers the stream until the palette is emitted at
+    // EOF, so memory grows with input length. Swap to a two-pass temp-palette
+    // file only if real long-form inputs ever OOM; verified fine on a 120s clip.
     filters.push(
       "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5"
     );
