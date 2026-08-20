@@ -119,7 +119,11 @@ describe("POST /api/convert (streaming upload)", () => {
     form.append("category", "image");
     form.append("targetFormat", "png");
     form.append("options", "{}");
-    const res = await fetch(`${base}/api/convert`, { method: "POST", body: form });
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
     expect(res.status).toBe(413);
   }, 30000);
 
@@ -690,7 +694,7 @@ describe("Code template endpoint (honest snippets)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = (await res.json()) as { code: { python: string } };
+    const data = (await res.json()) as { code: { python: string; node: string } };
     return { res, data };
   }
 
@@ -726,7 +730,37 @@ describe("Code template endpoint (honest snippets)", () => {
     const { res, data } = await getTemplate({ category: "data", sourceFormat: "json", targetFormat: "csv" });
     expect(res.status).toBe(200);
     expect(data.code.python).toContain("import csv");
+    expect(data.code.python).toContain("json.load");
     expect(data.code.python).toContain("Illustrative example");
+    expect(data.code.node).toContain("JSON.parse");
+    expect(data.code.node).toContain("Illustrative example");
+  });
+
+  it("data (csv->json) generates a csv-reader python example and csv-split node example", async () => {
+    const { res, data } = await getTemplate({ category: "data", sourceFormat: "csv", targetFormat: "json" });
+    expect(res.status).toBe(200);
+    // Source-aware: the Python snippet must read CSV, not json.load
+    expect(data.code.python).toContain("csv.reader");
+    expect(data.code.python).not.toContain("json.load");
+    // Node snippet must split on commas, not JSON.parse the CSV source
+    expect(data.code.node).toContain("line.split(',')");
+    expect(data.code.node).not.toContain("JSON.parse");
+  });
+
+  it("data (tsv->json) uses the tab delimiter in both snippets", async () => {
+    const { res, data } = await getTemplate({ category: "data", sourceFormat: "tsv", targetFormat: "json" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain('delimiter="\\t"');
+    expect(data.code.python).not.toContain("json.load");
+    expect(data.code.node).toContain("line.split('\\t')");
+    expect(data.code.node).not.toContain("JSON.parse");
+  });
+
+  it("data (json->tsv) keeps json parsing for a json source", async () => {
+    const { res, data } = await getTemplate({ category: "data", sourceFormat: "json", targetFormat: "tsv" });
+    expect(res.status).toBe(200);
+    expect(data.code.python).toContain("json.load");
+    expect(data.code.node).toContain("JSON.parse");
   });
 
   it("browser image (png->jpg) shows the PIL example", async () => {

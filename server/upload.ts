@@ -136,14 +136,30 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
     // limits during streaming. The multipart `category` field may arrive after
     // the file bytes, so it is never used for the streaming cap — only as a
     // fallback for the post-parse size check.
+    //
+    // Fail closed: a valid category must be present in the pre-file metadata
+    // (X-Category header and/or ?category= query). Without it we cannot select
+    // the correct streaming cap before the file bytes arrive, so we reject the
+    // request instead of silently falling back to the global 200 MB cap. The
+    // shipped browser client always sends both, so this only affects direct
+    // API callers, who must adopt the documented contract.
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
-    const headerCategory = (req.headers["x-category"] as string) || "";
-    const queryCategory = url.searchParams.get("category") || "";
-    const categoryFromMeta = (headerCategory || queryCategory || "").toLowerCase();
-    const categoryMaxSize =
-      categoryFromMeta && MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]
-        ? MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]
-        : GLOBAL_MAX_SIZE;
+    const headerCategory = ((req.headers["x-category"] as string) || "").toLowerCase();
+    const queryCategory = (url.searchParams.get("category") || "").toLowerCase();
+    if (headerCategory && queryCategory && headerCategory !== queryCategory) {
+      throw new UploadError("Category mismatch between X-Category header and query parameter", 400);
+    }
+    const categoryFromMeta = headerCategory || queryCategory;
+    if (!categoryFromMeta) {
+      throw new UploadError(
+        "Missing category: provide a valid category via the X-Category header or ?category= query parameter",
+        400
+      );
+    }
+    if (!MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES]) {
+      throw new UploadError(`Unknown category: ${categoryFromMeta}`, 400);
+    }
+    const categoryMaxSize = MAX_SIZES[categoryFromMeta as keyof typeof MAX_SIZES];
 
     const busboy = Busboy({
       headers: req.headers,

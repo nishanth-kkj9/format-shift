@@ -122,7 +122,12 @@ convert_audio("input.${src}", "output.${tgt}")`;
   if (cat === "data") {
     if (tgt === "csv" || tgt === "tsv") {
       const delimiter = tgt === "tsv" ? "\\t" : ",";
-      return `# Python Code (csv module)
+      // Source-aware parsing: JSON sources are parsed with json.load, while
+      // CSV/TSV sources are read with the csv module using the correct
+      // delimiter. This keeps the generated example consistent with the
+      // selected source format instead of always assuming JSON.
+      if (src === "json") {
+        return `# Python Code (csv module)
 import json
 import csv
 
@@ -137,6 +142,37 @@ with open("output.${tgt}", "w", newline="") as f:
             writer.writerow(row.values())
     else:
         writer.writerow(data)`;
+      }
+      if (src === "csv" || src === "tsv") {
+        const srcDelimiter = src === "tsv" ? "\\t" : ",";
+        return `# Python Code (csv module)
+import csv
+
+with open("input.${src}", newline="") as f:
+    reader = csv.reader(f, delimiter="${srcDelimiter}")
+    rows = list(reader)
+
+with open("output.${tgt}", "w", newline="") as f:
+    writer = csv.writer(f, delimiter="${delimiter}")
+    writer.writerows(rows)`;
+      }
+      return `# Python Code (illustrative example)
+# No single standard mapping for ${src} -> ${tgt}; adapt to your schema.`;
+    }
+    if (tgt === "json" && (src === "csv" || src === "tsv")) {
+      // JSON target from a CSV/TSV source: read rows with the csv module and
+      // serialize them to JSON — never json.load on a non-JSON source.
+      const srcDelimiter = src === "tsv" ? "\\t" : ",";
+      return `# Python Code (csv + json modules)
+import csv
+import json
+
+with open("input.${src}", newline="") as f:
+    reader = csv.reader(f, delimiter="${srcDelimiter}")
+    rows = list(reader)
+
+with open("output.json", "w") as f:
+    json.dump(rows, f, indent=2)`;
     }
     return `# Python Code (illustrative example)
 # No single standard mapping for ${src} -> ${tgt}; adapt to your schema.`;
@@ -172,11 +208,25 @@ async function convertImage() {
 convertImage();`;
   }
 
-  return `// Node.js Code (fs + JSON conversion)
+  if (cat === "data") {
+    if (src === "csv" || src === "tsv") {
+      const delimiter = src === "tsv" ? "\\t" : ",";
+      return `// Node.js Code (fs + csv conversion)
+import fs from 'fs';
+
+const text = fs.readFileSync('input.${src}', 'utf8');
+const rows = text.trim().split(/\\r?\\n/).map((line) => line.split('${delimiter}'));
+console.log(JSON.stringify(rows, null, 2));`;
+    }
+    return `// Node.js Code (fs + JSON conversion)
 import fs from 'fs';
 
 const data = JSON.parse(fs.readFileSync('input.${src}', 'utf8'));
 console.log(JSON.stringify(data, null, 2));`;
+  }
+
+  return `// Node.js Code (illustrative example)
+// No single standard recipe for ${cat} ${src} -> ${tgt}; adapt to your pipeline.`;
 }
 
 function buildHtml(cat: FileCategory, src: string, tgt: string, engine: string): string {

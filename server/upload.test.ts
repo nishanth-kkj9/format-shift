@@ -94,7 +94,9 @@ describe("parseUploadStream", () => {
       { name: "targetFormat", value: "webp" },
       { name: "options", value: "{}" },
     ]);
-    const up = await parseUploadStream(fakeReq(payload));
+    // The streaming cap must be known before the file bytes arrive, so the
+    // pre-file category metadata (header/query) is still required.
+    const up = await parseUploadStream(fakeReq(payload, { "x-category": "image" }));
     try {
       const onDisk = readFileSync(up.filePath);
       expect(onDisk.equals(PNG_BYTES)).toBe(true);
@@ -296,20 +298,6 @@ describe("parseUploadStream", () => {
     }
   });
 
-  it("rejects a file over the global 200MB cap even with no category header", async () => {
-    const big = Buffer.alloc(201 * 1024 * 1024, 0x61);
-    const payload = multipartBody([
-      { name: "targetFormat", value: "txt" },
-      { name: "file", filename: "huge.bin", type: "application/octet-stream", data: big },
-    ]);
-    // Whether busboy's per-file 'limit' event or the streaming global check wins
-    // the race depends on event ordering, so accept either message — both are 413.
-    await expect(parseUploadStream(fakeReq(payload))).rejects.toMatchObject({
-      status: 413,
-      message: /global limit|File too large/,
-    });
-  }, 60000);
-
   it("rejects a multipart body with no file part", async () => {
     // A part with no Content-Disposition is skipped by busboy; with no file the
     // parser has nothing to convert and the request is a client error.
@@ -318,12 +306,103 @@ describe("parseUploadStream", () => {
     );
     const pt = new PassThrough();
     Object.assign(pt, {
-      headers: { host: "localhost", "content-type": CT },
+      headers: { host: "localhost", "content-type": CT, "x-category": "image" },
       url: "/api/convert",
     });
     pt.end(malformed);
     await expect(parseUploadStream(pt as unknown as IncomingMessage)).rejects.toMatchObject({
       status: 400,
     });
+  });
+
+  describe("pre-file category metadata contract (fail closed)", () => {
+    it("rejects a request with no X-Category header and no query category", async () => {
+      const payload = multipartBody([
+        { name: "category", value: "image" },
+        { name: "targetFormat", value: "png" },
+        { name: "options", value: "{}" },
+        { name: "file", filename: "img.png", type: "image/png", data: PNG_BYTES },
+      ]);
+      await expect(parseUploadStream(fakeReq(payload))).rejects.toMatchObject({
+        status: 400,
+        message: /Missing category/,
+      });
+    });
+
+    it("rejects an unknown category", async () => {
+      const payload = multipartBody([
+        { name: "category", value: "image" },
+        { name: "targetFormat", value: "png" },
+        { name: "options", value: "{}" },
+        { name: "file", filename: "img.png", type: "image/png", data: PNG_BYTES },
+      ]);
+      await expect(parseUploadStream(fakeReq(payload, { "x-category": "nope" }))).rejects.toMatchObject({
+        status: 400,
+        message: /Unknown category/,
+      });
+    });
+
+    it("rejects a header/query category mismatch instead of silently choosing one", async () => {
+      const payload = multipartBody([
+        { name: "category", value: "image" },
+        { name: "targetFormat", value: "png" },
+        { name: "options", value: "{}" },
+        { name: "file", filename: "img.png", type: "image/png", data: PNG_BYTES },
+      ]);
+      await expect(
+        parseUploadStream(fakeReq(payload, { "x-category": "image" }, "/api/convert?category=document"))
+      ).rejects.toMatchObject({
+        status: 400,
+        message: /Category mismatch/,
+      });
+    });
+
+    it("accepts a request with only the query-string category", async () => {
+      const payload = multipartBody([
+        { name: "category", value: "image" },
+        { name: "targetFormat", value: "png" },
+        { name: "options", value: "{}" },
+        { name: "file", filename: "img.png", type: "image/png", data: PNG_BYTES },
+      ]);
+      const up = await parseUploadStream(fakeReq(payload, {}, "/api/convert?category=image"));
+      try {
+        expect(up.category).toBe("image");
+      } finally {
+        cleanup(up.tempDir, up.filePath);
+      }
+    });
+
+    it("enforces the document streaming cap (10MB) from pre-file metadata", async () => {
+      // 11MB with a valid document category fails at the streaming cap rather
+      // than being accepted under the global 200MB cap.
+      const big = Buffer.alloc(11 * 1024 * 1024, 0x61);
+      const payload = multipartBody([
+        { name: "category", value: "document" },
+        { name: "targetFormat", value: "txt" },
+        { name: "options", value: "{}" },
+        { name: "file", filename: "big.txt", type: "text/plain", data: big },
+      ]);
+      await expect(parseUploadStream(fakeReq(payload, { "x-category": "document" }))).rejects.toMatchObject({
+        status: 413,
+        message: /max 10MB/,
+      });
+    }, 30000);
+
+    it("continues to enforce the global 200MB cap as defense-in-depth for video", async () => {
+      const big = Buffer.alloc(201 * 1024 * 1024, 0x61);
+      const payload = multipartBody([
+        { name: "category", value: "video" },
+        { name: "targetFormat", value: "mp4" },
+        { name: "options", value: "{}" },
+        { name: "file", filename: "huge.mp4", type: "video/mp4", data: big },
+      ]);
+      // video's category cap is also 200MB, so the global check is the effective
+      // boundary. Busboy's per-file 'limit' event may win the race over the
+      // streaming check, so accept either message — both are 413.
+      await expect(parseUploadStream(fakeReq(payload, { "x-category": "video" }))).rejects.toMatchObject({
+        status: 413,
+        message: /global limit|File too large/,
+      });
+    }, 60000);
   });
 });

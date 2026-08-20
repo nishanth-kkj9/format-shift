@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { imageArgs, imageFilters } from "./ffmpeg/filters";
 import { videoArgs } from "./ffmpeg/video";
+import { audioArgs } from "./ffmpeg/audio";
 import { runFFmpeg } from "./ffmpeg/runner";
 import { validateOptions, InvalidOptionError, OPTIONS_SCHEMA } from "./convert";
 import { SERVER_OPTION_KEYS } from "../src/core/conversionRegistry";
@@ -101,6 +102,29 @@ describe("videoArgs", () => {
     const args = videoArgs({ targetFormat: "mp4", category: "video" });
     expect(args).not.toContain("-vf");
     expect(args).not.toContain("palettegen");
+  });
+});
+
+describe("audioArgs", () => {
+  it("emits a volume=0 filter for volume 0 (mute)", () => {
+    const args = audioArgs({ targetFormat: "mp3", category: "audio", volume: 0 });
+    expect(args).toContain("-filter:a");
+    expect(args[args.indexOf("-filter:a") + 1]).toBe("volume=0");
+  });
+
+  it("omits the volume filter for the neutral default (100)", () => {
+    const args = audioArgs({ targetFormat: "mp3", category: "audio", volume: 100 });
+    expect(args).not.toContain("-filter:a");
+  });
+
+  it("scales a non-default volume correctly", () => {
+    const args = audioArgs({ targetFormat: "mp3", category: "audio", volume: 50 });
+    expect(args[args.indexOf("-filter:a") + 1]).toBe("volume=0.5");
+  });
+
+  it("scales volume 200 to 2.0", () => {
+    const args = audioArgs({ targetFormat: "mp3", category: "audio", volume: 200 });
+    expect(args[args.indexOf("-filter:a") + 1]).toBe("volume=2");
   });
 });
 

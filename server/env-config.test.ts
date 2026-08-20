@@ -50,7 +50,11 @@ describe("Import-time env config is actually enforced", () => {
     form.append("category", "image");
     form.append("targetFormat", "webp");
     form.append("options", "{}");
-    const res = await fetch(`${base}/api/convert`, { method: "POST", body: form });
+    const res = await fetch(`${base}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
     expect(res.status).toBe(413);
   }, 30000);
 });
@@ -129,7 +133,11 @@ describe("FFmpeg timeout is reported distinctly", () => {
     form.append("category", "image");
     form.append("targetFormat", "webp");
     form.append("options", "{}");
-    const res = await fetch(`${base2}/api/convert`, { method: "POST", body: form });
+    const res = await fetch(`${base2}/api/convert`, {
+      method: "POST",
+      body: form,
+      headers: { "x-category": "image" },
+    });
     expect(res.status).toBe(504);
   }, 30000);
 });
