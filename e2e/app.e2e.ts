@@ -80,6 +80,27 @@ test.describe("FormatShift critical user flows", () => {
     await expect(dropdown).toContainText("jpg");
   });
 
+  test("format dropdown switches target format on mouse click", async ({ page }) => {
+    await page.goto("/");
+
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("button", { name: /choose files to convert/i }).click(),
+    ]);
+    await chooser.setFiles(makePngFixture());
+    await expect(page.getByText("fixture.png")).toBeVisible();
+
+    const dropdown = page.locator(DROPDOWN).first();
+    await expect(dropdown).toHaveAttribute("aria-label", /currently jpg/);
+
+    // Open with a click and pick PNG by mouse. This used to do nothing: the
+    // trigger's blur handler closed the menu on mousedown (before the option's
+    // click completed), so the selection never changed.
+    await dropdown.click();
+    await page.getByRole("option", { name: /PNG Image/i }).click();
+    await expect(dropdown).toHaveAttribute("aria-label", /currently png/);
+  });
+
   test("full image -> ico conversion via keyboard, then preview modal Esc closes", async ({ page }) => {
     await page.goto("/");
 

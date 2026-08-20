@@ -71,10 +71,15 @@ app.use(
   })
 );
 
-// Rate limit the conversion endpoint to prevent abuse
+// Rate limit the conversion endpoint to prevent abuse. Both limiters use the
+// built-in in-process memory store: their quotas are per server process, not
+// cluster-wide. The shipped deployment is a single container (one process), so
+// the limits below hold exactly as documented; if the app is ever scaled to
+// multiple replicas, these quotas multiply by replica count and the aggregate
+// limiter should move to a shared store (e.g. Redis) instead.
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 requests per minute per IP
+  max: 30, // 30 requests per minute per IP (per process)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
@@ -82,9 +87,12 @@ const apiLimiter = rateLimit({
 
 // Second, aggregate backstop across all IPs so a distributed burst can't tie up
 // every ffmpeg slot even when each individual IP stays under its own limit.
+// Per-process ceiling: 60 requests/min across ALL clients in this process.
+// ponytail: in-process store; swap to a shared store if multi-replica
+// deployment becomes the contract.
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 requests per minute across ALL clients
+  max: 60, // 60 requests per minute across ALL clients (per process)
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (_req) => "global",

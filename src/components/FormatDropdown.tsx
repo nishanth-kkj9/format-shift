@@ -190,8 +190,22 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
         disabled={disabled}
         onClick={() => (isOpen ? closeMenu() : openMenu(0))}
         onKeyDown={handleTriggerKeyDown}
-        onBlur={() => {
-          if (isOpen) closeMenu();
+        onBlur={(e) => {
+          // Mousedown on a menu option (a non-focusable div) moves focus to
+          // <body>, so relatedTarget is null; closing here would unmount the
+          // menu before the option's click completes and the selection would
+          // never change. Only close when focus actually moves elsewhere (e.g.
+          // Tab to another control); clicks outside are handled by the
+          // document mousedown listener above.
+          const related = e.relatedTarget as Node | null;
+          if (
+            isOpen &&
+            related &&
+            !e.currentTarget.contains(related) &&
+            !menuRef.current?.contains(related)
+          ) {
+            closeMenu();
+          }
         }}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
