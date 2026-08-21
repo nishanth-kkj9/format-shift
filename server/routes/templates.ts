@@ -232,9 +232,8 @@ console.log(JSON.stringify(data, null, 2));`;
 function buildHtml(cat: FileCategory, src: string, tgt: string, engine: string): string {
   if (engine === "server") {
     return `<!-- Server-side conversion: POST the file to your FFmpeg endpoint -->
-<form method="POST" action="/api/convert" enctype="multipart/form-data">
+<form method="POST" action="/api/convert?category=${cat}" enctype="multipart/form-data">
   <input type="file" name="file" />
-  <input type="hidden" name="category" value="${cat}" />
   <input type="hidden" name="sourceFormat" value="${src}" />
   <input type="hidden" name="targetFormat" value="${tgt}" />
   <button type="submit">Convert to ${tgt.toUpperCase()}</button>

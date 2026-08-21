@@ -694,7 +694,7 @@ describe("Code template endpoint (honest snippets)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = (await res.json()) as { code: { python: string; node: string } };
+    const data = (await res.json()) as { code: { python: string; node: string; html: string } };
     return { res, data };
   }
 
@@ -768,5 +768,15 @@ describe("Code template endpoint (honest snippets)", () => {
     expect(res.status).toBe(200);
     expect(data.code.python).toContain("PIL");
     expect(data.code.python).toContain("Illustrative example");
+  });
+
+  it("server HTML template carries category in query for upload contract", async () => {
+    const { res, data } = await getTemplate({ category: "image", sourceFormat: "png", targetFormat: "gif" });
+    expect(res.status).toBe(200);
+    // The generated HTML form must include ?category= in the action URL so
+    // the upload parser can enforce category-specific limits before file bytes
+    // arrive. A hidden field alone is too late (multipart arrives after headers).
+    expect(data.code.html).toContain('action="/api/convert?category=image"');
+    expect(data.code.html).not.toContain('action="/api/convert"');
   });
 });
