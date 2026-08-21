@@ -292,7 +292,19 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
       }, timeoutMs);
     }
 
-    proc = spawn(FFMPEG_BIN, ["-hide_banner", "-nostdin", ...inputArgs, ...args, outPath]);
+    // Cap the muxing queue to prevent OOM on large/complex conversions.
+    // ponytail: this limits muxer buffering only, not total process memory.
+    // Full process memory limiting belongs at the container level (--memory).
+    const muxQueueMB = Math.max(128, Math.round(1024 / MAX_CONCURRENT_FFMPEG));
+    proc = spawn(FFMPEG_BIN, [
+      "-hide_banner",
+      "-nostdin",
+      "-max_muxing_queue_size",
+      `${muxQueueMB * 1024}`,
+      ...inputArgs,
+      ...args,
+      outPath,
+    ]);
     proc.stderr?.on("data", (c: Buffer) => err.push(c));
 
     // Kill a runaway encoder whose output file outgrows the cap before it fills
