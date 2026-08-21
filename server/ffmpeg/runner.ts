@@ -299,10 +299,10 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     proc = spawn(FFMPEG_BIN, [
       "-hide_banner",
       "-nostdin",
-      "-max_muxing_queue_size",
-      `${muxQueueMB * 1024}`,
       ...inputArgs,
       ...args,
+      "-max_muxing_queue_size",
+      `${muxQueueMB * 1024}`,
       outPath,
     ]);
     proc.stderr?.on("data", (c: Buffer) => err.push(c));

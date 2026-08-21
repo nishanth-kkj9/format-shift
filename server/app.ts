@@ -120,15 +120,13 @@ app.use((req, res, next) => {
 // API endpoints
 app.get("/api/health", (_req, res) => {
   const concurrency = getFFmpegConcurrency();
-  const ffmpegVersion = getFFmpegVersionSync();
+  // Version info is exposed only on /api/ready (internal Docker probes).
+  // /api/health is public — omitting version strings reduces attack surface.
   res.json({
     status: "ok",
     app: "FormatShift Universal Converter",
     timestamp: new Date().toISOString(),
     ffmpegAvailable: Boolean(FFMPEG_BIN),
-    ffmpegVersion,
-    ffmpegFeatureCompatible: isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_FEATURE_VERSION),
-    ffmpegSecurityBaselineOk: isFfmpegAtLeast(ffmpegVersion, FFMPEG_MIN_SECURITY_VERSION),
     ffmpegConcurrency: {
       max: concurrency.max,
       active: concurrency.active,
