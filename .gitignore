@@ -21,4 +21,5 @@ test-2s.wav
 
 # IDE
 .vscode/
+.analysis/
 
