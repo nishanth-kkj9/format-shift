@@ -14,6 +14,10 @@ export const envSchema = z.object({
   FFMPEG_MAX_CONCURRENCY: z.coerce.number().int().positive().max(64).default(2),
   FFMPEG_TIMEOUT_MS: z.coerce.number().int().positive().max(1_800_000).default(300000),
   FFMPEG_MAX_OUTPUT_BYTES: z.coerce.number().int().positive().max(4_294_967_296).optional(),
+  // Per-IP requests/minute for /api/code-template (a cheap, CPU-free endpoint,
+  // so its ceiling is far more generous than /api/convert's). Overridable so
+  // tests can exercise the 429 path without flooding.
+  CODE_TEMPLATE_RATE_LIMIT_MAX: z.coerce.number().int().positive().max(10_000).default(120),
   FFMPEG_MIN_SECURITY_VERSION: FFMPEG_VERSION.optional(),
   FFMPEG_MIN_FEATURE_VERSION: FFMPEG_VERSION.optional(),
 });

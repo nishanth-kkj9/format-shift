@@ -556,11 +556,7 @@ export default function App() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <Dropzone
-            onFilesAdded={handleFilesAdded}
-            selectedCategory={selectedCategory}
-            onBatchTargetChange={handleApplyGlobalFormat}
-          />
+          <Dropzone onFilesAdded={handleFilesAdded} selectedCategory={selectedCategory} />
         </motion.div>
 
         {/* File Queue List */}

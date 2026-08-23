@@ -5,10 +5,11 @@ import { PassThrough } from "node:stream";
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
   execFileSync: vi.fn(),
+  execFile: vi.fn(),
 }));
 
-import { spawn } from "node:child_process";
-import { runFFmpeg, FFmpegTimeoutError } from "./runner";
+import { spawn, execFile } from "node:child_process";
+import { runFFmpeg, FFmpegTimeoutError, getFFmpegVersion, getFFmpegVersionSync } from "./runner";
 
 const mockSpawn = vi.mocked(spawn);
 
@@ -28,7 +29,10 @@ function fakeChild(): EventEmitter & {
   return child;
 }
 
-beforeEach(() => mockSpawn.mockReset());
+beforeEach(() => {
+  mockSpawn.mockReset();
+  vi.mocked(execFile).mockReset();
+});
 
 describe("runFFmpeg child-process failures", () => {
   it("rejects with the spawn error when the binary cannot start", async () => {
@@ -91,5 +95,20 @@ describe("runFFmpeg child-process failures", () => {
     child.emit("close", 0);
     await expect(pending).resolves.toBeTruthy();
     expect(child.kill).not.toHaveBeenCalled();
+  });
+});
+
+describe("getFFmpegVersion probe failures", () => {
+  it("caches null when the ffmpeg -version probe errors", async () => {
+    // Simulate the binary being unresolvable/unrunnable: execFile invokes its
+    // callback with an error. The runner must surface null (both async and
+    // sync readers) rather than throwing or reporting a bogus version.
+    vi.mocked(execFile).mockImplementation(((...args: unknown[]) => {
+      const cb = args[3] as (err: Error | null, stdout: string) => void;
+      cb(new Error("spawn ffmpeg ENOENT"), "");
+    }) as never);
+
+    await expect(getFFmpegVersion()).resolves.toBeNull();
+    expect(getFFmpegVersionSync()).toBeNull();
   });
 });

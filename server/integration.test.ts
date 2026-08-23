@@ -128,12 +128,28 @@ describe("POST /api/convert (streaming upload)", () => {
   }, 30000);
 
   it("cleans up temp files after conversion", async () => {
-    const before = new Set(readdirSync(tmpdir()));
-    await postConvert(new Blob([TINY_PNG]), "cleanup.png");
-    const after = new Set(readdirSync(tmpdir()));
-    // no new fs-up-* temp dirs left behind
-    const leftover = [...after].filter((f) => f.startsWith("fs-up-") && !before.has(f));
-    expect(leftover).toEqual([]);
+    // Point the upload handler's temp dir at a private sandbox so the leftover
+    // check can't race with fs-up-* dirs created by concurrently running test
+    // workers sharing the OS temp dir (upload.ts resolves tmpdir() per
+    // request, so the env override takes effect for this conversion only).
+    const sandbox = mkdtempSync(join(tmpdir(), "fs-cleanup-"));
+    const prevTmp = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
+    process.env.TEMP = process.env.TMP = process.env.TMPDIR = sandbox;
+    try {
+      const res = await postConvert(new Blob([TINY_PNG]), "cleanup.png");
+      expect(res.status).toBe(200);
+      // no fs-up-* temp dirs left behind in the sandbox
+      const leftover = readdirSync(sandbox).filter((f) => f.startsWith("fs-up-"));
+      expect(leftover).toEqual([]);
+    } finally {
+      if (prevTmp.TEMP === undefined) delete process.env.TEMP;
+      else process.env.TEMP = prevTmp.TEMP;
+      if (prevTmp.TMP === undefined) delete process.env.TMP;
+      else process.env.TMP = prevTmp.TMP;
+      if (prevTmp.TMPDIR === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = prevTmp.TMPDIR;
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   }, 30000);
 });
 
@@ -373,23 +389,36 @@ describe("Multipart structural limits", () => {
   }, 30000);
 
   it("cleans up temp files after a structural rejection", async () => {
-    const before = new Set(readdirSync(tmpdir()));
-    const form = buildForm({
-      file: new Blob([TINY_PNG]),
-      second: new Blob([TINY_PNG]),
-      category: "image",
-      targetFormat: "png",
-      options: "{}",
-    });
-    const res = await fetch(`${base}/api/convert`, {
-      method: "POST",
-      body: form,
-      headers: { "x-category": "image" },
-    });
-    expect(res.status).toBe(413);
-    const after = new Set(readdirSync(tmpdir()));
-    const leftover = [...after].filter((f) => f.startsWith("fs-up-") && !before.has(f));
-    expect(leftover).toEqual([]);
+    // Private sandbox for the same reason as the cleanup test above: the
+    // leftover check must not race with other workers' fs-up-* dirs.
+    const sandbox = mkdtempSync(join(tmpdir(), "fs-cleanup-"));
+    const prevTmp = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
+    process.env.TEMP = process.env.TMP = process.env.TMPDIR = sandbox;
+    try {
+      const form = buildForm({
+        file: new Blob([TINY_PNG]),
+        second: new Blob([TINY_PNG]),
+        category: "image",
+        targetFormat: "png",
+        options: "{}",
+      });
+      const res = await fetch(`${base}/api/convert`, {
+        method: "POST",
+        body: form,
+        headers: { "x-category": "image" },
+      });
+      expect(res.status).toBe(413);
+      const leftover = readdirSync(sandbox).filter((f) => f.startsWith("fs-up-"));
+      expect(leftover).toEqual([]);
+    } finally {
+      if (prevTmp.TEMP === undefined) delete process.env.TEMP;
+      else process.env.TEMP = prevTmp.TEMP;
+      if (prevTmp.TMP === undefined) delete process.env.TMP;
+      else process.env.TMP = prevTmp.TMP;
+      if (prevTmp.TMPDIR === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = prevTmp.TMPDIR;
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   }, 30000);
 });
 

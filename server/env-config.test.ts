@@ -87,6 +87,15 @@ describe("env schema semantic upper bounds", () => {
     expect(envSchema.safeParse({ FFMPEG_MAX_OUTPUT_BYTES: "8589934592" }).success).toBe(false);
   });
 
+  it("accepts a sane CODE_TEMPLATE_RATE_LIMIT_MAX and rejects absurd values", () => {
+    expect(envSchema.safeParse({ CODE_TEMPLATE_RATE_LIMIT_MAX: "120" }).success).toBe(true);
+    expect(envSchema.safeParse({ CODE_TEMPLATE_RATE_LIMIT_MAX: "10000" }).success).toBe(true);
+    expect(envSchema.safeParse({ CODE_TEMPLATE_RATE_LIMIT_MAX: "10001" }).success).toBe(false);
+    expect(envSchema.safeParse({ CODE_TEMPLATE_RATE_LIMIT_MAX: "0" }).success).toBe(false);
+    expect(envSchema.safeParse({ CODE_TEMPLATE_RATE_LIMIT_MAX: "-5" }).success).toBe(false);
+    expect(envSchema.safeParse({ CODE_TEMPLATE_RATE_LIMIT_MAX: "abc" }).success).toBe(false);
+  });
+
   it("accepts well-formed version pins as major.minor.patch", () => {
     expect(envSchema.safeParse({ FFMPEG_MIN_SECURITY_VERSION: "5.1.9" }).success).toBe(true);
     expect(envSchema.safeParse({ FFMPEG_MIN_FEATURE_VERSION: "4.2.0" }).success).toBe(true);

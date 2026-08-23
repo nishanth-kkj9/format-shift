@@ -99,13 +99,30 @@ const globalLimiter = rateLimit({
   message: { error: "Too many requests, please try again later." },
 });
 
+// Third limiter for /api/code-template: the endpoint is cheap (no ffmpeg, a
+// registry lookup and string building), so its per-IP ceiling is far more
+// generous than /api/convert's, but it still gets defense-in-depth parity —
+// an unauthenticated JSON endpoint should never be unmetered. The default is
+// well above normal UI usage (the code-snippet modal makes at most one call
+// per open); tests override CODE_TEMPLATE_RATE_LIMIT_MAX to exercise the 429
+// path without flooding.
+const templatesLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: env.CODE_TEMPLATE_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
 // Integration tests hit /api/convert ~30+ times per suite run (per-IP cap is
 // 30), so the limiters would 429 legitimate test traffic. They guard real
-// deployments, not the test harness.
+// deployments, not the test harness. The templates limiter stays mounted in
+// test mode because its ceiling is env-configurable (see above).
 if (process.env.NODE_ENV !== "test") {
   app.use("/api/convert", apiLimiter);
   app.use("/api/convert", globalLimiter);
 }
+app.use("/api/code-template", templatesLimiter);
 
 // Simple request logger (no external dependency)
 app.use((req, res, next) => {

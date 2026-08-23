@@ -1,19 +1,15 @@
 import React, { useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Upload, Image, Music, Video, Database, Wand2 } from "lucide-react";
-import { FileCategory, TargetFormat } from "../types";
+import { FileCategory } from "../types";
 import { generateSampleFile } from "../utils/converter";
 
 interface DropzoneProps {
   onFilesAdded: (files: File[]) => void;
   selectedCategory: FileCategory | "all";
-  onBatchTargetChange?: (format: TargetFormat) => void;
 }
 
-export const Dropzone: React.FC<DropzoneProps> = ({
-  onFilesAdded,
-  onBatchTargetChange: _onBatchTargetChange,
-}) => {
+export const Dropzone: React.FC<DropzoneProps> = ({ onFilesAdded }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
