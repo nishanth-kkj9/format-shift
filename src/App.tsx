@@ -2,13 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "motion/react";
 import { FileCategory, TargetFormat, ConversionItem, ConversionHistoryItem } from "./types";
-import {
-  detectCategoryAndFormats,
-  convertImage,
-  convertAudio,
-  convertVideo,
-  convertDataDocument,
-} from "./utils/converter";
+import { detectCategoryAndFormats, convertImage, convertAudio, convertDataDocument } from "./utils/converter";
 import { extractFileMetadata } from "./utils/metadata";
 import {
   clearHistoryRevoking,
@@ -284,17 +278,6 @@ export default function App() {
           abortController.signal
         );
         resultBlob = res.blob;
-        duration = res.duration;
-      } else if (item.category === "video") {
-        const res = await convertVideo(
-          item.file,
-          item.targetFormat,
-          item.options.video!,
-          updateProgress,
-          abortController.signal
-        );
-        resultBlob = res.blob;
-        dimensions = res.dimensions;
         duration = res.duration;
       } else {
         const res = await convertDataDocument(

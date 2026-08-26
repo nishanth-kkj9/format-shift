@@ -3,7 +3,6 @@ import { jsonToCsv, csvToJson, jsonToXml, jsonToYaml, markdownToHtml, formatByte
 import { resolveTrimRange, renderFrameLength, trackAudioContextClose } from "./convertAudio";
 import { convertDataDocument } from "./convertData";
 import { convertAudio } from "./convertAudio";
-import { convertVideo } from "./convertVideo";
 import { guardedSettlers } from "./convertImage";
 import { planConversion } from "../core/conversionRegistry";
 
@@ -485,13 +484,6 @@ describe("browser converters refuse unsupported targets", () => {
         { bitrate: "192k", sampleRate: 44100, channels: 2, volume: 100 },
         () => {}
       )
-    ).rejects.toThrow(/FFmpeg server/);
-  });
-
-  it("convertVideo rejects server-only containers", async () => {
-    const file = fakeFile("v.mp4", "video/mp4", "x");
-    await expect(
-      convertVideo(file, "mkv" as never, { resolution: "original", fps: 30, muteAudio: false }, () => {})
     ).rejects.toThrow(/FFmpeg server/);
   });
 
