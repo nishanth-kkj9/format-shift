@@ -119,6 +119,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose, h
                         download={item.convertedName}
                         className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shrink-0 cursor-pointer shadow-md"
                         title="Download File"
+                        aria-label={`Download ${item.convertedName}`}
                       >
                         <Download className="w-4 h-4" />
                       </a>

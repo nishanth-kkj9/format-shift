@@ -232,6 +232,7 @@ export const FileList: React.FC<FileListProps> = ({
                         type="button"
                         onClick={() => onOpenOptions(item)}
                         title="Adjust Quality & Fine-Tuning Options"
+                        aria-label="Adjust Quality & Fine-Tuning Options"
                         className="p-1.5 rounded-xl border border-white/10 glass-input text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                       >
                         <Sliders className="w-4 h-4" />
@@ -265,6 +266,7 @@ export const FileList: React.FC<FileListProps> = ({
                             type="button"
                             onClick={() => onCancelConversion(item.id)}
                             title="Cancel Conversion"
+                            aria-label="Cancel Conversion"
                             className="p-2 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                           >
                             <XCircle className="w-4 h-4" />
@@ -281,6 +283,7 @@ export const FileList: React.FC<FileListProps> = ({
                             type="button"
                             onClick={() => onPreview(item)}
                             title="Preview Before / After Quality"
+                            aria-label="Preview Before / After Quality"
                             className="p-2 rounded-xl border border-white/10 glass-input text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
                           >
                             <Eye className="w-4 h-4 text-indigo-400" />
@@ -304,6 +307,7 @@ export const FileList: React.FC<FileListProps> = ({
                         type="button"
                         onClick={() => onRemove(item.id)}
                         title="Remove from Queue"
+                        aria-label="Remove from Queue"
                         className="p-2 rounded-xl text-slate-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
