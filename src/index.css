@@ -150,10 +150,10 @@ html:not(.dark) .text-slate-300\/80 {
   color: rgba(71, 85, 105, 0.8);
 }
 html:not(.dark) .text-slate-300\/70 {
-  color: rgba(71, 85, 105, 0.7);
+  color: rgba(51, 65, 85, 0.85);
 }
 html:not(.dark) .text-slate-400 {
-  color: #64748b;
+  color: #475569;
 }
 html:not(.dark) .text-slate-500 {
   color: #64748b;
