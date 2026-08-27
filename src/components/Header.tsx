@@ -139,24 +139,28 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Mobile Category Navigation Bar */}
-      <div className="md:hidden flex items-center gap-1.5 px-4 py-2 border-t border-white/10 overflow-x-auto no-scrollbar">
-        {categories.map((cat) => {
-          const isActive = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => onSelectCategory(cat.id)}
-              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
-                isActive
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "bg-white/5 text-slate-300 border border-white/10"
-              }`}
-            >
-              <span>{cat.icon}</span>
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
+      <div className="md:hidden relative border-t border-white/10">
+        <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto no-scrollbar">
+          {categories.map((cat) => {
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => onSelectCategory(cat.id)}
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                  isActive
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-white/5 text-slate-300 border border-white/10"
+                }`}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Fade gradient scroll affordance */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none" />
       </div>
     </header>
   );
