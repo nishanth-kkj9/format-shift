@@ -39,6 +39,7 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
               </div>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
