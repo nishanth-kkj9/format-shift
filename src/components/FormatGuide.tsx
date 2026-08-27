@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, FileText, Image, Music, Database } from "lucide-react";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface FormatGuideProps {
   isOpen: boolean;
@@ -8,6 +9,8 @@ interface FormatGuideProps {
 }
 
 export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(isOpen, dialogRef, onClose);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -27,6 +30,11 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 15 }}
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="format-guide-title"
+            tabIndex={-1}
             className="relative z-10 w-full max-w-3xl bg-slate-900 text-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden glass-card flex flex-col max-h-[85vh]"
           >
             {/* Header */}
@@ -35,7 +43,7 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
                 <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                   <FileText className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-black text-white">Format Selection Guide & Cheat Sheet</h3>
+                <h3 id="format-guide-title" className="text-sm font-black text-white">Format Selection Guide &amp; Cheat Sheet</h3>
               </div>
               <button
                 onClick={onClose}
