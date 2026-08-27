@@ -147,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={cat.id}
                 onClick={() => onSelectCategory(cat.id)}
-                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                className={`min-h-11 px-3 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
                   isActive
                     ? "bg-indigo-600 text-white shadow-md"
                     : "bg-white/5 text-slate-300 border border-white/10"
