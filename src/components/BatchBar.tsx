@@ -56,24 +56,32 @@ export const BatchBar: React.FC<BatchBarProps> = ({
           <select
             onChange={(e) => e.target.value && onApplyGlobalFormat(e.target.value as TargetFormat)}
             defaultValue=""
+            aria-label="Set all file formats"
             className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-900/90 text-indigo-300 border border-indigo-500/40 focus:ring-2 focus:ring-indigo-500 cursor-pointer uppercase shadow-inner"
           >
             <option value="" disabled>
               Set All Formats...
             </option>
-            {(["image", "audio", "video", "data", "document"] as FileCategory[]).map((cat) => {
-              const targets = getAvailableTargets(cat);
-              if (targets.length === 0) return null;
-              return (
-                <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
-                  {targets.map((fmt) => (
-                    <option key={fmt} value={fmt}>
-                      All to .{fmt.toUpperCase()}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
+            {(() => {
+              const seen = new Set<string>();
+              return (["image", "audio", "video", "data", "document"] as FileCategory[]).map((cat) => {
+                const targets = getAvailableTargets(cat).filter((fmt) => {
+                  if (seen.has(fmt)) return false;
+                  seen.add(fmt);
+                  return true;
+                });
+                if (targets.length === 0) return null;
+                return (
+                  <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
+                    {targets.map((fmt) => (
+                      <option key={fmt} value={fmt}>
+                        All to .{fmt.toUpperCase()}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              });
+            })()}
           </select>
         </div>
 
