@@ -251,6 +251,9 @@ html:not(.dark) .bg-slate-950\/60 {
 html:not(.dark) .bg-slate-800 {
   background-color: #e2e8f0;
 }
+html:not(.dark) .ring-offset-slate-950 {
+  --tw-ring-offset-color: #ffffff;
+}
 
 /* Subtle tinted surfaces (white-based glass in dark -> slate-tinted in light) */
 html:not(.dark) .bg-white\/5 {
