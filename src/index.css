@@ -113,6 +113,27 @@
   }
 }
 
+/* Respect users who request reduced motion: pause decorative/looping
+   animations while keeping the interface fully usable. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow,
+  .animate-bounce-slow,
+  .orb-1,
+  .orb-2,
+  .shimmer-bg {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
