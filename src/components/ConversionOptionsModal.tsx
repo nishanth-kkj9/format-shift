@@ -212,10 +212,16 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                       />
                       <span className="text-xs font-mono font-bold text-slate-300">{imageOpts.bgColor}</span>
                       <div className="flex gap-1.5 ml-auto">
-                        {["#0f172a", "#ffffff", "#000000", "#4f46e5"].map((hex) => (
+                        {[
+                          { hex: "#0f172a", label: "Dark slate" },
+                          { hex: "#ffffff", label: "White" },
+                          { hex: "#000000", label: "Black" },
+                          { hex: "#4f46e5", label: "Indigo" },
+                        ].map(({ hex, label }) => (
                           <button
                             key={hex}
                             type="button"
+                            aria-label={`Background: ${label}`}
                             onClick={() => setImageOpts({ ...imageOpts, bgColor: hex })}
                             className="w-6 h-6 rounded-lg border border-white/30 cursor-pointer hover:scale-110 transition-transform"
                             style={{ backgroundColor: hex }}
