@@ -67,9 +67,9 @@ export const Dropzone: React.FC<DropzoneProps> = ({ onFilesAdded }) => {
         whileTap={{ scale: 0.99 }}
         animate={{ scale: isDragOver ? 1.03 : 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        role="button"
+        role="region"
         tabIndex={0}
-        aria-label="Choose files to convert. Press Enter or Space to browse."
+        aria-labelledby="dropzone-heading"
         onKeyDown={handleKeyDown}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -96,7 +96,7 @@ export const Dropzone: React.FC<DropzoneProps> = ({ onFilesAdded }) => {
 
           {/* Main Headline */}
           <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            <h2 id="dropzone-heading" className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               Drag & Drop files here, or{" "}
               <span className="text-indigo-400 underline decoration-indigo-400/50 underline-offset-4">
                 browse
