@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenFormatGuide}
             title="Format Guide & Cheat Sheet"
             aria-label="Guide"
-            className="px-2.5 py-1.5 rounded-xl glass-input border border-white/10 text-slate-200 hover:border-indigo-400/50 hover:text-indigo-300 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+            className="min-h-11 min-w-11 px-2.5 py-1.5 rounded-xl glass-input border border-white/10 text-slate-200 hover:border-indigo-400/50 hover:text-indigo-300 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer"
           >
             <FileText className="w-4 h-4 text-indigo-400" />
             <span className="hidden lg:inline">Guide</span>
@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenCodeModal}
             title="Get Python, Node.js & HTML Code"
             aria-label="API Snippets"
-            className="px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-emerald-400/50 hover:text-emerald-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
+            className="min-h-11 min-w-11 px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-emerald-400/50 hover:text-emerald-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
           >
             <Code2 className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline">API Snippets</span>
@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenHistory}
             title="Conversion History"
             aria-label="History"
-            className="relative px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-amber-400/50 hover:text-amber-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
+            className="relative min-h-11 min-w-11 px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-amber-400/50 hover:text-amber-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
           >
             <History className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">History</span>
@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onToggleTheme}
             title="Toggle Light/Dark Theme"
             aria-label="Toggle Light/Dark Theme"
-            className="p-2 rounded-xl border border-white/10 glass-input text-amber-400 hover:bg-white/10 transition-colors cursor-pointer"
+            className="min-h-11 min-w-11 p-2 rounded-xl border border-white/10 glass-input text-amber-400 hover:bg-white/10 transition-colors cursor-pointer"
           >
             {isDark ? (
               <Sun className="w-4 h-4 text-amber-400" />
