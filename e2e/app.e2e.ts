@@ -36,7 +36,7 @@ test.describe("FormatShift critical user flows", () => {
   test("dropzone is keyboard-operable and opens the file picker on Enter", async ({ page }) => {
     await page.goto("/");
 
-    const dropzone = page.getByRole("button", { name: /choose files to convert/i });
+    const dropzone = page.getByRole("region", { name: /Drag & Drop files here/i });
     await expect(dropzone).toBeVisible();
     await expect(dropzone).toHaveAttribute("tabindex", "0");
 
@@ -56,7 +56,7 @@ test.describe("FormatShift critical user flows", () => {
     // Upload via the hidden input (chooser-driven, not keyboard).
     const [chooser] = await Promise.all([
       page.waitForEvent("filechooser"),
-      page.getByRole("button", { name: /choose files to convert/i }).click(),
+      page.getByRole("region", { name: /Drag & Drop/i }).click(),
     ]);
     await chooser.setFiles(makePngFixture());
     await expect(page.getByText("fixture.png")).toBeVisible();
@@ -85,7 +85,7 @@ test.describe("FormatShift critical user flows", () => {
 
     const [chooser] = await Promise.all([
       page.waitForEvent("filechooser"),
-      page.getByRole("button", { name: /choose files to convert/i }).click(),
+      page.getByRole("region", { name: /Drag & Drop/i }).click(),
     ]);
     await chooser.setFiles(makePngFixture());
     await expect(page.getByText("fixture.png")).toBeVisible();
@@ -106,7 +106,7 @@ test.describe("FormatShift critical user flows", () => {
 
     const [chooser] = await Promise.all([
       page.waitForEvent("filechooser"),
-      page.getByRole("button", { name: /choose files to convert/i }).click(),
+      page.getByRole("region", { name: /Drag & Drop/i }).click(),
     ]);
     await chooser.setFiles(makePngFixture());
     await expect(page.getByText("fixture.png")).toBeVisible();
