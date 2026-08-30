@@ -79,6 +79,13 @@ export default function App() {
   // retained set is atomic with the history transition, never render-captured.
   const queueUrlsRef = useRef<Set<string>>(new Set());
 
+  // Always holds latest queue so long-lived async batch closures see edits
+  // made after handleConvertAll was invoked (mirrors abortControllersRef pattern).
+  const queueRef = useRef<ConversionItem[]>(queue);
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
   // Sync theme class to <html> tag and persist the preference.
   useEffect(() => {
     if (isDark) {
@@ -216,9 +223,9 @@ export default function App() {
     );
   };
 
-  // Convert Single File
+  // Convert Single File — reads latest queue via ref so batch edits after start are honored.
   const convertSingleFile = async (id: string) => {
-    const item = queue.find((q) => q.id === id);
+    const item = queueRef.current.find((q) => q.id === id);
     if (!item) return;
 
     // Create abort controller for this conversion
@@ -361,7 +368,7 @@ export default function App() {
   // Convert All Pending Files — run up to 3 conversions concurrently for
   // better batch throughput without overwhelming the browser/server.
   const handleConvertAll = async () => {
-    const pendingItems = queue.filter((item) => item.status !== "completed");
+    const pendingItems = queueRef.current.filter((item) => item.status !== "completed");
     const CONCURRENCY = 3;
     let nextIndex = 0;
 
