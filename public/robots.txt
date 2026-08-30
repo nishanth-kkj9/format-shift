@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://formatshift.example.com/sitemap.xml

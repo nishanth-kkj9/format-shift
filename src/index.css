@@ -1,4 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
 
 @layer utilities {
   .bg-checkered {
@@ -113,6 +118,27 @@
   }
 }
 
+/* Respect users who request reduced motion: pause decorative/looping
+   animations while keeping the interface fully usable. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow,
+  .animate-bounce-slow,
+  .orb-1,
+  .orb-2,
+  .shimmer-bg {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -150,10 +176,10 @@ html:not(.dark) .text-slate-300\/80 {
   color: rgba(71, 85, 105, 0.8);
 }
 html:not(.dark) .text-slate-300\/70 {
-  color: rgba(71, 85, 105, 0.7);
+  color: rgba(51, 65, 85, 0.85);
 }
 html:not(.dark) .text-slate-400 {
-  color: #64748b;
+  color: #475569;
 }
 html:not(.dark) .text-slate-500 {
   color: #64748b;
@@ -250,6 +276,9 @@ html:not(.dark) .bg-slate-950\/60 {
 }
 html:not(.dark) .bg-slate-800 {
   background-color: #e2e8f0;
+}
+html:not(.dark) .ring-offset-slate-950 {
+  --tw-ring-offset-color: #ffffff;
 }
 
 /* Subtle tinted surfaces (white-based glass in dark -> slate-tinted in light) */

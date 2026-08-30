@@ -1,5 +1,18 @@
 import React from "react";
-import { RefreshCw, Code2, History, Sun, Moon, FileText } from "lucide-react";
+import {
+  RefreshCw,
+  Code2,
+  History,
+  Sun,
+  Moon,
+  FileText,
+  Sparkles,
+  Image as ImageIcon,
+  Music,
+  Video,
+  Database,
+  File as FileDoc,
+} from "lucide-react";
 import { FileCategory } from "../types";
 
 interface HeaderProps {
@@ -23,13 +36,13 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   historyCount,
 }) => {
-  const categories: { id: FileCategory | "all"; label: string; icon: string }[] = [
-    { id: "all", label: "All Formats", icon: "✨" },
-    { id: "image", label: "Images", icon: "🖼️" },
-    { id: "audio", label: "Audio", icon: "🎵" },
-    { id: "video", label: "Video", icon: "🎬" },
-    { id: "data", label: "Data", icon: "📊" },
-    { id: "document", label: "Docs", icon: "📄" },
+  const categories: { id: FileCategory | "all"; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: "all", label: "All Formats", Icon: Sparkles },
+    { id: "image", label: "Images", Icon: ImageIcon },
+    { id: "audio", label: "Audio", Icon: Music },
+    { id: "video", label: "Video", Icon: Video },
+    { id: "data", label: "Data", Icon: Database },
+    { id: "document", label: "Docs", Icon: FileDoc },
   ];
 
   return (
@@ -65,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
         <nav className="hidden md:flex items-center gap-1 p-1 rounded-2xl glass-input border border-white/10">
           {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
+            const Icon = cat.Icon;
             return (
               <button
                 key={cat.id}
@@ -75,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : "text-slate-300 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <span>{cat.icon}</span>
+                <Icon className="w-3.5 h-3.5" />
                 <span>{cat.label}</span>
               </button>
             );
@@ -89,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenFormatGuide}
             title="Format Guide & Cheat Sheet"
             aria-label="Guide"
-            className="px-2.5 py-1.5 rounded-xl glass-input border border-white/10 text-slate-200 hover:border-indigo-400/50 hover:text-indigo-300 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+            className="min-h-11 min-w-11 px-2.5 py-1.5 rounded-xl glass-input border border-white/10 text-slate-200 hover:border-indigo-400/50 hover:text-indigo-300 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer"
           >
             <FileText className="w-4 h-4 text-indigo-400" />
             <span className="hidden lg:inline">Guide</span>
@@ -100,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenCodeModal}
             title="Get Python, Node.js & HTML Code"
             aria-label="API Snippets"
-            className="px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-emerald-400/50 hover:text-emerald-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
+            className="min-h-11 min-w-11 px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-emerald-400/50 hover:text-emerald-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
           >
             <Code2 className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline">API Snippets</span>
@@ -111,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenHistory}
             title="Conversion History"
             aria-label="History"
-            className="relative px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-amber-400/50 hover:text-amber-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
+            className="relative min-h-11 min-w-11 px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 hover:border-amber-400/50 hover:text-amber-300 transition-all flex items-center gap-1.5 text-xs font-bold glass-input cursor-pointer"
           >
             <History className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">History</span>
@@ -127,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onToggleTheme}
             title="Toggle Light/Dark Theme"
             aria-label="Toggle Light/Dark Theme"
-            className="p-2 rounded-xl border border-white/10 glass-input text-amber-400 hover:bg-white/10 transition-colors cursor-pointer"
+            className="min-h-11 min-w-11 p-2 rounded-xl border border-white/10 glass-input text-amber-400 hover:bg-white/10 transition-colors cursor-pointer"
           >
             {isDark ? (
               <Sun className="w-4 h-4 text-amber-400" />
@@ -139,24 +153,29 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Mobile Category Navigation Bar */}
-      <div className="md:hidden flex items-center gap-1.5 px-4 py-2 border-t border-white/10 overflow-x-auto no-scrollbar">
-        {categories.map((cat) => {
-          const isActive = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => onSelectCategory(cat.id)}
-              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
-                isActive
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "bg-white/5 text-slate-300 border border-white/10"
-              }`}
-            >
-              <span>{cat.icon}</span>
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
+      <div className="md:hidden relative border-t border-white/10">
+        <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto no-scrollbar">
+          {categories.map((cat) => {
+            const isActive = selectedCategory === cat.id;
+            const Icon = cat.Icon;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => onSelectCategory(cat.id)}
+                className={`min-h-11 px-3 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                  isActive
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-white/5 text-slate-300 border border-white/10"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Fade gradient scroll affordance */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none" />
       </div>
     </header>
   );

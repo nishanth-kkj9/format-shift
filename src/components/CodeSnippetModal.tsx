@@ -116,6 +116,7 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
               </div>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -256,7 +257,7 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             {/* Footer */}
             <div className="px-6 py-3 bg-slate-900/80 text-[11px] text-slate-400 flex justify-between items-center">
               <span>FormatShift Developer Suite</span>
-              <button onClick={onClose} className="font-bold text-indigo-400 hover:underline cursor-pointer">
+              <button onClick={onClose} aria-label="Close" className="font-bold text-indigo-400 hover:underline cursor-pointer">
                 Close
               </button>
             </div>
