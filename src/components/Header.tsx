@@ -36,7 +36,11 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   historyCount,
 }) => {
-  const categories: { id: FileCategory | "all"; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  const categories: {
+    id: FileCategory | "all";
+    label: string;
+    Icon: React.ComponentType<{ className?: string }>;
+  }[] = [
     { id: "all", label: "All Formats", Icon: Sparkles },
     { id: "image", label: "Images", Icon: ImageIcon },
     { id: "audio", label: "Audio", Icon: Music },

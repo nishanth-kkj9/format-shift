@@ -43,7 +43,9 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
                 <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                   <FileText className="w-5 h-5" />
                 </div>
-                <h3 id="format-guide-title" className="text-sm font-black text-white">Format Selection Guide &amp; Cheat Sheet</h3>
+                <h3 id="format-guide-title" className="text-sm font-black text-white">
+                  Format Selection Guide &amp; Cheat Sheet
+                </h3>
               </div>
               <button
                 onClick={onClose}
