@@ -1,5 +1,18 @@
 import React from "react";
-import { RefreshCw, Code2, History, Sun, Moon, FileText } from "lucide-react";
+import {
+  RefreshCw,
+  Code2,
+  History,
+  Sun,
+  Moon,
+  FileText,
+  Sparkles,
+  Image as ImageIcon,
+  Music,
+  Video,
+  Database,
+  File as FileDoc,
+} from "lucide-react";
 import { FileCategory } from "../types";
 
 interface HeaderProps {
@@ -23,13 +36,13 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   historyCount,
 }) => {
-  const categories: { id: FileCategory | "all"; label: string; icon: string }[] = [
-    { id: "all", label: "All Formats", icon: "✨" },
-    { id: "image", label: "Images", icon: "🖼️" },
-    { id: "audio", label: "Audio", icon: "🎵" },
-    { id: "video", label: "Video", icon: "🎬" },
-    { id: "data", label: "Data", icon: "📊" },
-    { id: "document", label: "Docs", icon: "📄" },
+  const categories: { id: FileCategory | "all"; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: "all", label: "All Formats", Icon: Sparkles },
+    { id: "image", label: "Images", Icon: ImageIcon },
+    { id: "audio", label: "Audio", Icon: Music },
+    { id: "video", label: "Video", Icon: Video },
+    { id: "data", label: "Data", Icon: Database },
+    { id: "document", label: "Docs", Icon: FileDoc },
   ];
 
   return (
@@ -65,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
         <nav className="hidden md:flex items-center gap-1 p-1 rounded-2xl glass-input border border-white/10">
           {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
+            const Icon = cat.Icon;
             return (
               <button
                 key={cat.id}
@@ -75,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : "text-slate-300 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <span>{cat.icon}</span>
+                <Icon className="w-3.5 h-3.5" />
                 <span>{cat.label}</span>
               </button>
             );
@@ -143,6 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto no-scrollbar">
           {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
+            const Icon = cat.Icon;
             return (
               <button
                 key={cat.id}
@@ -153,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : "bg-white/5 text-slate-300 border border-white/10"
                 }`}
               >
-                <span>{cat.icon}</span>
+                <Icon className="w-3.5 h-3.5" />
                 <span>{cat.label}</span>
               </button>
             );
