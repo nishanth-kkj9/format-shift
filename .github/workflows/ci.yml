@@ -121,11 +121,29 @@ jobs:
           tags: fs:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Scans both the Debian packages and the shipped node_modules. `output`
+      # writes the table to a file so the next step can surface it in the job
+      # summary — a failing gate should state which CVE tripped it without
+      # anyone having to open the (auth-gated) raw job log.
       - name: Scan for vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: fs:ci
           format: table
+          output: trivy-report.txt
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
+          vuln-type: os,library
+      - name: Publish vulnerability report
+        if: always()
+        run: |
+          if [ -s trivy-report.txt ]; then
+            {
+              echo "### Container vulnerability scan (HIGH/CRITICAL, fixable only)"
+              echo
+              echo '```'
+              cat trivy-report.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

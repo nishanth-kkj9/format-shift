@@ -307,14 +307,23 @@ The repository ships a substantial automated test suite:
 
 ### CI Pipeline (GitHub Actions)
 
-| Job                | Steps                                                                |
-| ------------------ | -------------------------------------------------------------------- |
-| **quality**        | `npm ci`, lockfile drift check, typecheck, lint, format check, build |
-| **test**           | Full Vitest suite with V8 coverage → Codecov                         |
-| **security-audit** | `npm audit --audit-level=high`                                       |
-| **docker**         | Multi-stage image build + Trivy scan for HIGH/CRITICAL               |
+| Job                | Steps                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| **quality**        | `npm ci`, lockfile drift check, typecheck, lint, format check, build                      |
+| **test**           | Full Vitest suite with V8 coverage → Codecov                                              |
+| **security-audit** | `npm audit --audit-level=high`                                                            |
+| **docker**         | Multi-stage image build (with base-layer security updates) + Trivy scan for HIGH/CRITICAL |
 
 Releases are published from a separate `docker-release.yml` workflow: on a `v*` tag push it builds and pushes `ghcr.io/<owner>/format-shift` for `linux/amd64` and `linux/arm64`, and creates a GitHub Release with auto-generated notes.
+
+#### About the container scan gate
+
+The `docker` job scans the built image (`fs:ci`) with Trivy for **HIGH/CRITICAL** findings that have a published fix (`ignore-unfixed: true`), covering both Debian packages and the shipped `node_modules`. Everything it finds is written to the job summary, so a failing run names the offending package without needing the raw log.
+
+Two things keep that gate honest:
+
+- The runtime stage applies `apt-get upgrade` on top of the pinned `node:22-*-slim` base image. Official `-slim` tags are only rebuilt occasionally, so their Debian packages go stale while Trivy keeps learning about published fixes; without the upgrade the gate fails on vulnerabilities the base image shipped weeks earlier rather than on anything in this repository.
+- Dependencies are separately gated by `npm audit --audit-level=high` in the `security-audit` job, so a red `docker` job usually means base-image packages, not app code. When it does fail, rebuild to pick up the current fixes, and bump the pinned base image once a newer `node:22-*-slim` tag exists.
 
 Run the full local validation:
 

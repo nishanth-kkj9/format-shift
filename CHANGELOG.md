@@ -20,6 +20,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- CI `docker` job: the Trivy HIGH/CRITICAL gate failed on 2026-09-18 with the
+  image building successfully, because the pinned `node:22.23.2-slim` base image
+  (last rebuilt 2026-08-25) carried Debian packages that had since received
+  security fixes. The runtime stage now applies `apt-get upgrade` so the shipped
+  layer carries current security patches, and the scan report is published to the
+  job summary so a failure names the offending package.
 - Light mode: the header scroll affordance no longer smears a dark slate gradient
   across the light sticky header.
 - Light mode: all five overlay backdrops now share one scrim treatment, tuned to

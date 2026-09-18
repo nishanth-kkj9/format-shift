@@ -12,8 +12,20 @@ WORKDIR /app
 
 # System ffmpeg (glibc) instead of ffmpeg-static's musl binaries, which fail on
 # Debian/Ubuntu. node:22-slim is glibc-based, so the packaged ffmpeg works.
+#
+# `apt-get upgrade` is deliberate: the node:*-slim tags are only rebuilt
+# occasionally (e.g. node:22.23.2-slim dates from 2026-08-25), so the Debian
+# packages baked into the base layer go stale while the Trivy gate keeps
+# learning about the fixes Debian has since published. Installing ffmpeg alone
+# never upgrades those shared libraries. Pulling the current security fixes for
+# the base layer here keeps the HIGH/CRITICAL scan gate meaningful instead of
+# failing on packages the base image shipped weeks ago.
+#
+# DEBIAN_FRONTEND=noninteractive prevents an upgrade from blocking on a
+# conffile/tzdata prompt and hanging the build.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg wget \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg wget \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
