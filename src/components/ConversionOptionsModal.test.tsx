@@ -187,4 +187,18 @@ describe("ConversionOptionsModal", () => {
     // Video defaults apply because the item carried no video options of its own.
     expect(saved.video).toMatchObject({ resolution: "720p", fps: 60, muteAudio: true });
   });
+
+  it("exposes pressed state on the flip toggle buttons", async () => {
+    const user = userEvent.setup();
+    renderModal(makeItem());
+
+    const flipHorizontal = screen.getByRole("button", { name: "Flip Horizontal" });
+    const flipVertical = screen.getByRole("button", { name: "Flip Vertical" });
+    expect(flipHorizontal).toHaveAttribute("aria-pressed", "false");
+    expect(flipVertical).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(flipHorizontal);
+    expect(flipHorizontal).toHaveAttribute("aria-pressed", "true");
+    expect(flipVertical).toHaveAttribute("aria-pressed", "false");
+  });
 });

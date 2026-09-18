@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Code2, Copy, Check } from "lucide-react";
+import { X, Code2, Copy, Check, AlertTriangle } from "lucide-react";
 import { CodeTemplateResponse, FileCategory } from "../types";
 import { CONVERSION_REGISTRY, getAvailableTargets } from "../core/conversionRegistry";
 import { useDialogFocus } from "../hooks/useDialogFocus";
+import { buildLocalFallback } from "../utils/snippetFallback";
 
 interface CodeSnippetModalProps {
   isOpen: boolean;
@@ -12,6 +13,23 @@ interface CodeSnippetModalProps {
   sourceFormat?: string;
   targetFormat?: string;
 }
+
+type SnippetTab = "python" | "node" | "html";
+
+const SNIPPET_TABS: SnippetTab[] = ["python", "node", "html"];
+
+const TAB_LABEL: Record<SnippetTab, string> = {
+  python: "Python",
+  node: "Node.js",
+  html: "HTML5 / JS",
+};
+
+// Active-tab styling is unchanged from the original dark-first design.
+const TAB_ACTIVE_CLASS: Record<SnippetTab, string> = {
+  python: "bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)]",
+  node: "bg-emerald-600 text-white shadow-[0_0_12px_rgba(5,150,105,0.4)]",
+  html: "bg-orange-600 text-white shadow-[0_0_12px_rgba(234,88,12,0.4)]",
+};
 
 export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   isOpen,
@@ -23,9 +41,14 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(isOpen, dialogRef, onClose);
 
-  const [activeTab, setActiveTab] = useState<"python" | "node" | "html">("python");
+  const [activeTab, setActiveTab] = useState<SnippetTab>("python");
   const [copied, setCopied] = useState(false);
+  /** Pointers for APG roving-tabindex focus movement between snippet tabs. */
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [codeData, setCodeData] = useState<CodeTemplateResponse["code"] | null>(null);
+  // D-4: true when the server snippet request failed and generic local
+  // templates are shown instead — surfaced to the user as a visible notice.
+  const [isFallback, setIsFallback] = useState(false);
 
   // Local state for user-selectable conversion parameters. Reset via the parent's
   // key={queue[0]?.id} remount, so no effect is needed to sync props -> state.
@@ -44,23 +67,37 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    // Guard against out-of-order responses when the selection changes quickly:
+    // only the newest request is allowed to update state.
+    let cancelled = false;
+
     fetch("/api/code-template", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: selCategory, sourceFormat: selSource, targetFormat: selTarget }),
     })
-      .then((res) => res.json())
-      .then((data: CodeTemplateResponse) => {
+      .then((res) => {
+        // Non-2xx (e.g. 429 rate limit, 500) must fall through to the local
+        // fallback instead of parsing an error body as a template payload.
+        if (!res.ok) throw new Error(`API responded with status ${res.status}`);
+        return res.json() as Promise<CodeTemplateResponse>;
+      })
+      .then((data) => {
+        if (cancelled) return;
         setCodeData(data.code);
+        setIsFallback(false);
       })
       .catch(() => {
-        // Fallback local code templates
-        setCodeData({
-          python: `# Python Code (PIL/Pillow)\nfrom PIL import Image\n\nimg = Image.open('input.${selSource}')\nimg.save('output.${selTarget}')`,
-          node: `// Node.js Code\nimport sharp from 'sharp';\n\nawait sharp('input.${selSource}').toFile('output.${selTarget}');`,
-          html: `<!-- HTML5 + Canvas JS -->\n<script>\nconst canvas = document.createElement('canvas');\n</script>`,
-        });
+        if (cancelled) return;
+        // Fallback local code templates — category-aware, and flagged so the UI
+        // can tell the user these are generic starters, not tailored output.
+        setCodeData(buildLocalFallback(selCategory, selSource, selTarget));
+        setIsFallback(true);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, selCategory, selSource, selTarget]);
 
   const currentCode = codeData ? codeData[activeTab] : "";
@@ -69,6 +106,17 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
     navigator.clipboard.writeText(currentCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  /** APG tablist keyboard support: Left/Right move between snippet languages. */
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    const index = SNIPPET_TABS.indexOf(activeTab);
+    const delta = event.key === "ArrowRight" ? 1 : -1;
+    const next = SNIPPET_TABS[(index + delta + SNIPPET_TABS.length) % SNIPPET_TABS.length];
+    setActiveTab(next);
+    tabRefs.current[next]?.focus();
   };
 
   return (
@@ -190,39 +238,49 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
               </div>
             </div>
 
+            {/* D-4: visible notice when generic fallback templates are shown */}
+            {isFallback && (
+              <div
+                role="status"
+                className="mx-6 mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>
+                  Server unreachable — showing generic starter templates instead of code tailored to this
+                  conversion.
+                </span>
+              </div>
+            )}
+
             {/* Language Tabs & Copy Action */}
             <div className="flex items-center justify-between px-6 py-2.5 border-b border-white/10 bg-slate-950/60">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActiveTab("python")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === "python"
-                      ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)]"
-                      : "text-slate-400 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  🐍 Python
-                </button>
-                <button
-                  onClick={() => setActiveTab("node")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === "node"
-                      ? "bg-emerald-600 text-white shadow-[0_0_12px_rgba(5,150,105,0.4)]"
-                      : "text-slate-400 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  🟢 Node.js
-                </button>
-                <button
-                  onClick={() => setActiveTab("html")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeTab === "html"
-                      ? "bg-orange-600 text-white shadow-[0_0_12px_rgba(234,88,12,0.4)]"
-                      : "text-slate-400 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  🌐 HTML5 / JS
-                </button>
+              <div
+                role="tablist"
+                aria-label="Code language"
+                className="flex gap-2"
+                onKeyDown={handleTabKeyDown}
+              >
+                {SNIPPET_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    ref={(element) => {
+                      tabRefs.current[tab] = element;
+                    }}
+                    role="tab"
+                    id={`snippet-tab-${tab}`}
+                    aria-selected={activeTab === tab}
+                    aria-controls="snippet-code-panel"
+                    tabIndex={activeTab === tab ? 0 : -1}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeTab === tab
+                        ? TAB_ACTIVE_CLASS[tab]
+                        : "text-slate-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {TAB_LABEL[tab]}
+                  </button>
+                ))}
               </div>
 
               <motion.button
@@ -244,7 +302,12 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
             </div>
 
             {/* Code Output Terminal Block */}
-            <div className="p-6 overflow-y-auto flex-1 bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed border-b border-white/10">
+            <div
+              role="tabpanel"
+              id="snippet-code-panel"
+              aria-labelledby={`snippet-tab-${activeTab}`}
+              className="p-6 overflow-y-auto flex-1 bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed border-b border-white/10"
+            >
               {loading ? (
                 <div className="text-slate-500 py-12 text-center animate-pulse">
                   Generating runnable code snippet...

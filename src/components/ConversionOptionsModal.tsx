@@ -301,6 +301,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             flipHorizontal: !imageOpts.flipHorizontal,
                           })
                         }
+                        aria-pressed={!!imageOpts.flipHorizontal}
                         className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
                           imageOpts.flipHorizontal
                             ? "bg-indigo-600 text-white border-indigo-400"
@@ -317,6 +318,7 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                             flipVertical: !imageOpts.flipVertical,
                           })
                         }
+                        aria-pressed={!!imageOpts.flipVertical}
                         className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
                           imageOpts.flipVertical
                             ? "bg-indigo-600 text-white border-indigo-400"

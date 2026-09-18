@@ -13,6 +13,7 @@ export default defineConfig({
         "src/utils/metadata.ts",
         "src/utils/serverConvert.ts",
         "src/utils/convertData.ts",
+        "src/utils/snippetFallback.ts",
         "src/core/conversionRegistry.ts",
         "server/upload.ts",
         "server/convert.ts",

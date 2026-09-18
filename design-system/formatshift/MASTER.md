@@ -18,20 +18,23 @@
 
 | Role       | Hex       | CSS Variable         |
 | ---------- | --------- | -------------------- |
-| Primary    | `#1E293B` | `--color-primary`    |
+| Primary    | `#0F172A` | `--color-primary`    |
 | Secondary  | `#334155` | `--color-secondary`  |
-| CTA/Accent | `#22C55E` | `--color-cta`        |
+| CTA/Accent | `#4F46E5` | `--color-cta`        |
+| Accent-2   | `#818CF8` | `--color-cta-light`  |
 | Background | `#0F172A` | `--color-background` |
 | Text       | `#F8FAFC` | `--color-text`       |
 
-**Color Notes:** Code dark + run green
+**Color Notes:** Slate dark glass + indigo accent (dark default; light mode remaps
+surfaces via `html:not(.dark)` overrides in `src/index.css`). Violet `#A855F7`
+is reserved for decorative mesh/orb gradients, never for interactive controls.
 
 ### Typography
 
-- **Heading Font:** Satoshi
-- **Body Font:** General Sans
+- **Heading Font:** DM Sans
+- **Body Font:** DM Sans
 - **Mood:** premium, modern, clean, sophisticated, versatile, balanced
-- **Google Fonts:** [Satoshi + General Sans](https://fonts.google.com/share?selection.family=DM+Sans:wght@400;500;700)
+- **Google Fonts:** [DM Sans](https://fonts.google.com/share?selection.family=DM+Sans:wght@400;500;700)
 
 **CSS Import:**
 
@@ -69,7 +72,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #22c55e;
+  background: #4f46e5;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -79,7 +82,7 @@
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background: #4338ca;
   transform: translateY(-1px);
 }
 
@@ -126,9 +129,9 @@
 }
 
 .input:focus {
-  border-color: #1e293b;
+  border-color: #4f46e5;
   outline: none;
-  box-shadow: 0 0 0 3px #1e293b20;
+  box-shadow: 0 0 0 3px #4f46e520;
 }
 ```
 

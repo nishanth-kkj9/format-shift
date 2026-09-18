@@ -4,6 +4,40 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `ReducedMotionProvider`: a single `MotionConfig` mounted at the app root so the
+  JS-driven `motion/react` animations (springs, `whileHover`/`whileTap`) honor
+  `prefers-reduced-motion`, complementing the existing CSS animation guard.
+- Category-aware offline starter templates in the code-snippets modal: when
+  `/api/code-template` is unreachable the fallback now matches the selected file
+  type (ffmpeg for media, csv/json for data, Markdown for documents) instead of
+  always suggesting an image toolchain, and the modal labels them as generic.
+- Tests for the snippets fallback + tab semantics, and pressed-state coverage for
+  the options modal flip toggles.
+
+### Fixed
+
+- Light mode: the header scroll affordance no longer smears a dark slate gradient
+  across the light sticky header.
+- Light mode: all five overlay backdrops now share one scrim treatment, tuned to
+  45% instead of a near-black 75% (previously the drawer used a white scrim while
+  the four modals stayed dark).
+- Light mode: the file progress track renders as a light inset groove instead of a
+  black bar inside a white card.
+- Light mode: the "Shift" wordmark gradient is darkened for AA contrast
+  (previously ~2.8:1 against light glass).
+- Code-snippets language tabs now expose `tablist`/`tab`/`aria-selected` with
+  arrow-key navigation; the flip toggles in the options modal report `aria-pressed`.
+
+### Changed
+
+- Design-system `MASTER.md` palette and typography synced to the shipped UI
+  (indigo accent, DM Sans) instead of the stale green/Satoshi values.
+- `.env.example` documents `CODE_TEMPLATE_RATE_LIMIT_MAX`.
+
 ## [0.1.0] - 2026-08-16
 
 ### Added

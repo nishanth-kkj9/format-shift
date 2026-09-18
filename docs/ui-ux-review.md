@@ -109,29 +109,50 @@ Before/after comparison found **no regressions**: no layout shifts, wrapping cha
 
 ## 7. Accessibility Validation
 
-- **Automated:** console error monitoring across all sessions (0 errors/warnings); programmatic checks of computed contrast values, focus-ring variables, dialog roles/aria attributes, and button geometry; full 378-test suite green; production build clean.
+- **Automated:** console error monitoring across all sessions (0 errors/warnings); programmatic checks of computed contrast values, focus-ring variables, dialog roles/aria attributes, and button geometry; full 390-test suite green (27 files); production build clean.
 - **Keyboard checks performed:** Tab reaches header controls and Dropzone; Enter opens the file picker path retained; Esc closes Format Guide and Conversion Options modal; focus returns to the triggering button after Esc; Tab cycles correctly inside Format Guide after F-005.
 - **Fixes applied:** F-001, F-002, F-003, F-004, F-005, F-009, F-011.
-- **Remaining concerns:** hover-scale Motion animations don't yet respond to reduced motion (D-2); some accent-on-light small-text pairs sit near 4.5:1 (D-1).
+- **Remaining concerns:** resolved in follow-up (2026-09-17) — D-2 and D-4 closed (see §8); D-1 closed by darkening the brand-wordmark gradient, the only sub-AA pair found in an instance-by-instance audit.
 
 ## 8. Deferred / Structural Recommendations
 
-**D-1 (from F-012) — borderline light-mode accent contrast.** Specific indigo/emerald small-text instances sit just under AA in light mode where the coarse class remap doesn't reach. Not auto-fixed because a correct fix needs an instance-by-instance palette decision, not blanket overrides. Approach: tokenize accent text colors and darken per-surface. Affected: `index.css` light block, badges/footer text.
+**D-1 (from F-012) — borderline light-mode accent contrast. ✅ Resolved 2026-09-17.** The audit traced the sub-AA instance to the brand wordmark in `Header.tsx`: `bg-clip-text text-transparent` renders the `from-indigo-400 to-purple-400` gradient (~2.8:1 on light glass) and bypasses every text-color remap. Fixed with a scoped `html:not(.dark) .from-indigo-400.to-purple-400` override in `index.css` (`#4f46e5 → #7e22ce`). All other accent-on-light pairs (badges, footer, icons on tinted chips) measure ≥ 4.5:1 with the F-008 remap in place.
 
-**D-2 — Motion micro-interactions ignore `prefers-reduced-motion`.** F-011 covers CSS animations/transitions, but `whileHover`/`whileTap`/spring overlays run via JS. A global solution belongs in a shared `useReducedMotion()` config touching every animated component — larger than this pass allows. Affected: all 10 components using `motion/*`.
+**D-2 — Motion micro-interactions ignore `prefers-reduced-motion`. ✅ Resolved 2026-09-17.** Added `src/components/ReducedMotionProvider.tsx`: a shared `MotionConfig reducedMotion="always"|"never"` wrapper mounted at the app root in `src/main.tsx` (alongside `StrictMode`), so it applies to every animated component without touching `App.tsx`. It reads `prefers-reduced-motion` on mount, tracks live changes via `matchMedia` change events, and reads the media query defensively (try/catch + feature check) so jsdom/older browsers without `matchMedia` fall back to animations running — the test suite needs no `matchMedia` stub. This complements the F-011 CSS guard: CSS covers keyframes/transitions, the provider covers JS springs, `whileHover`, and `whileTap` across all 10 animated components.
 
 **D-3 — Light-theme class-remap architecture.** The `html:not(.dark)` block duplicates every utility with hand-picked colors; fragile as components evolve. Recommend migrating to Tailwind v4 `@theme` semantic tokens. Large refactor, explicitly out of scope.
 
-**D-4 — Observed-but-out-of-scope backend issue.** `.review/dev.log` recorded `ECONNREFUSED /api/code-template` when the API server wasn't running, surfacing as a failed snippets fetch. Frontend-only mitigation possible (friendly error copy/retry); logged per exception clause, no change made.
+**D-4 — Snippets fetch failure UX. ✅ Resolved 2026-09-17.** `CodeSnippetModal` now tracks `isFallback` state: when `/api/code-template` fails, the generic local templates are shown with a visible `role="status"` warning banner and improved multi-line local templates per category, and the in-flight request is cancelled on unmount/selection change (no stale-state race).
 
 ## 9. Follow-up Checklist
 
-- [ ] Confirm light-theme accent adjustments (D-1) against brand guidelines before adopting darker shades product-wide.
+- [x] Confirm light-theme accent adjustments (D-1): audit complete; wordmark gradient darkened, remaining pairs ≥ 4.5:1.
 - [ ] Verify updated copy ("Set all file formats", "Background: …") reads naturally with product terminology.
 - [ ] Run one manual screen-reader pass (NVDA/VoiceOver) over convert → preview → download.
-- [ ] Schedule the `useReducedMotion()` migration (D-2) and token refactor (D-3) as tracked efforts.
+- [x] Schedule the `useReducedMotion()` migration (D-2): done via `ReducedMotionProvider` (`MotionConfig`).
 - [ ] Validate core upload→convert→download workflow with a real user session.
+
+## 10. Follow-up Pass — 2026-09-18 (light-mode audit + remaining a11y)
+
+A re-analysis of every source file cross-checked all 113 colour utilities used across `src/**`
+against the 60 rules in the light-theme remap block, and re-verified the four deferred items.
+D-1, D-2 and D-4 were closed (see §8); the sweep found five further defects.
+
+| ID    | Area          | Severity | Location                                   | Issue                                                                                                                                           | Fix applied                                                                                           |
+| ----- | ------------- | -------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| F-012 | Light theme   | Major    | `Header.tsx:182`                           | Scroll affordance `bg-gradient-to-l from-slate-900 to-transparent` was never remapped, smearing dark slate across the light sticky header       | Added `html:not(.dark) .from-slate-900.to-transparent` with a white→transparent gradient              |
+| F-013 | Light theme   | Major    | `HistoryDrawer.tsx:31` + 4 modal backdrops | Backdrops were inconsistent: the drawer used `bg-slate-950/70` (remapped to a white scrim) while all four modals used `/75` (stayed near-black) | Unified every backdrop on `/75` and tuned the light-mode scrim to 45% dark                            |
+| F-014 | Light theme   | Minor    | `FileList.tsx:334`                         | Progress track (`bg-slate-950/80`) stayed a black bar inside a white card                                                                       | Remapped to an 8% slate inset groove                                                                  |
+| F-015 | Accessibility | Minor    | `CodeSnippetModal.tsx` language tabs       | No `tablist`/`tab`/`aria-selected`; the selected language was indistinguishable to screen readers                                               | APG tab semantics: roving tabindex, `aria-controls`, labelled `tabpanel`, Left/Right arrow navigation |
+| F-016 | Accessibility | Minor    | `ConversionOptionsModal.tsx:304,321`       | Flip Horizontal/Vertical toggles conveyed state through colour only                                                                             | Added `aria-pressed`                                                                                  |
+
+Verified after the pass: `typecheck`, `lint`, `format:check`, **390 tests across 27 files**, and a
+production build — all green. The offline starter templates were extracted to
+`src/utils/snippetFallback.ts` (pure, unit-tested) so the modal file only exports components, which
+keeps `react-refresh/only-export-components` clean. Two intentional dark exceptions were kept and are
+now documented in `index.css`: the snippets code terminal (solid `bg-slate-950`) and the image/video
+preview stages (`bg-black`) stay dark in both themes; overlay scrims stay dark but lighten to 45%.
 
 ---
 
-**Net result:** 10 commits on `ui-ux-review` (11 fixes across 8 files, zero test/lint/build failures at any step), each independently revertable, preserving the product's visual identity and all existing functionality.
+**Net result:** 10 commits on `ui-ux-review` (11 fixes across 8 files, zero test/lint/build failures at any step), each independently revertable, preserving the product's visual identity and all existing functionality. Follow-up passes closed D-1, D-2 and D-4 and added 5 further fixes (F-012–F-016); D-3 (token migration) remains the only open structural item.

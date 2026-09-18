@@ -121,5 +121,7 @@ describe("batch Convert All stale closure (BUG-01)", () => {
 
     // BUG-01: with stale closure this is "csv"; fixed it must be "xml"
     expect(captured[3]).toBe("xml");
-  });
+    // Four sample uploads + four queued conversions in jsdom routinely exceed the
+    // 5s default once Vitest's coverage instrumentation is enabled.
+  }, 20000);
 });

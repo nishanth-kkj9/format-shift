@@ -254,6 +254,33 @@ html:not(.dark) .text-pink-400 {
   color: #db2777;
 }
 
+/* D-1: brand wordmark gradient (bg-clip-text + text-transparent in Header)
+   bypasses the color remaps above, so its gradient stops must be darkened
+   directly for AA contrast on light glass. Scoped to the exact utility pair
+   the wordmark uses; dark mode is untouched. */
+html:not(.dark) .from-indigo-400.to-purple-400 {
+  background-image: linear-gradient(to right, #4f46e5, #7e22ce);
+}
+
+/* Overlay scrims. The dark-authored 75% backdrop stays dark in light mode — a
+   dimmed page still reads as "behind the dialog" — but is lightened so a light
+   UI is not covered by a near-black sheet. All five overlays use this class. */
+html:not(.dark) .bg-slate-950\/75 {
+  background-color: rgba(15, 23, 42, 0.45);
+}
+
+/* Inset progress track (dark-authored) becomes a light groove in light mode so
+   it does not read as a black bar inside a white card. */
+html:not(.dark) .bg-slate-950\/80 {
+  background-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Header scroll affordance (`bg-gradient-to-l from-slate-900 to-transparent`)
+   would otherwise smear a dark gradient across the light sticky header. */
+html:not(.dark) .from-slate-900.to-transparent {
+  background-image: linear-gradient(to left, #ffffff, transparent);
+}
+
 /* Surfaces */
 html:not(.dark) .bg-slate-950,
 html:not(.dark) .bg-slate-900 {
