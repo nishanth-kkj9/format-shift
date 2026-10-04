@@ -41,6 +41,11 @@ export async function convertDataDocument(
       } else {
         resultText = JSON.stringify(parsed, null, options?.indentSpaces || 2);
       }
+    } else if (tgt === "txt" && isHtmlSource(file.name, text)) {
+      // HTML -> plain text must strip the markup: returning the source verbatim
+      // would ship HTML labelled as .txt. (HTML -> Markdown is refused outright,
+      // since no HTML parser is integrated.)
+      resultText = htmlToPlainText(text);
     } else {
       const sep = tabularSeparator(text, file.name);
       if (sep) {
@@ -59,7 +64,10 @@ export async function convertDataDocument(
         }
       } else {
         if (tgt === "html") {
-          resultText = markdownToHtml(text);
+          // An HTML source asked for HTML is already what it claims to be; running
+          // it through the Markdown renderer would HTML-escape the markup and wrap
+          // it in a second document, mangling a valid file.
+          resultText = isHtmlSource(file.name, text) ? text : markdownToHtml(text);
         } else if (tgt === "json") {
           resultText = JSON.stringify({ content: text, lines: text.split("\n") }, null, 2);
         } else {
@@ -90,6 +98,38 @@ function isJson(str: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** True when the upload is HTML: by extension, or by an unmistakable opening tag. */
+function isHtmlSource(name: string, text: string): boolean {
+  if (/\.html?$/i.test(name)) return true;
+  return /^\s*(?:<!doctype\s+html|<html\b|<head\b|<body\b|<p\b|<div\b|<table\b)/i.test(text);
+}
+
+/**
+ * HTML -> plain text. Deliberately not a general HTML parser (none is
+ * integrated here): comments, script/style bodies and remaining tags are
+ * removed, block-level closers become line breaks, list items become dashes,
+ * and the common named/numeric entities are decoded. Entities are decoded last
+ * so a decoded "<" can never be mistaken for a tag. Exported for unit tests.
+ */
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li\b[^>]*>/gi, "\n- ")
+    .replace(/<\/(p|div|h[1-6]|li|tr|section|article|header|footer|blockquote|ul|ol|table)>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**

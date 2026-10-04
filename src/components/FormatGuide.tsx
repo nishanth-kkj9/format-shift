@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, FileText, Image, Music, Database } from "lucide-react";
+import { X, FileText, Image, Music, Video, Database } from "lucide-react";
 import { useDialogFocus } from "../hooks/useDialogFocus";
 
 interface FormatGuideProps {
@@ -85,10 +85,18 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
                     </p>
                   </div>
                   <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-rose-400 block text-xs">.GIF / .BMP</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      .GIF is 256-colour palette output (and the video-clip animation target). .BMP is
+                      uncompressed lossless pixel data. Both are produced by the server engine.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
                     <span className="font-black text-emerald-400 block text-xs">.ICO / .SVG</span>
                     <p className="text-slate-300 leading-relaxed">
-                      .ICO is standard for web favicons (32x32px). .SVG is vector graphics scalable to any
-                      resolution without loss.
+                      .ICO is standard for web favicons (32x32px). .SVG is accepted as a vector source and
+                      rendered at the size you choose; converting <em>to</em> .SVG wraps a raster image in SVG
+                      markup, so it does not create scalable vector output.
                     </p>
                   </div>
                 </div>
@@ -114,6 +122,105 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
                       high-fidelity sound.
                     </p>
                   </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-purple-400 block text-xs">.OGG / .AAC</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      .OGG (Vorbis) and .AAC are efficient lossy formats for streaming and smaller downloads,
+                      both encoded by the server engine.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-pink-400 block text-xs">.M4A / .FLAC</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      .M4A wraps AAC audio for Apple devices; .FLAC is lossless compression for archiving
+                      without giving up quality.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-slate-200 block text-xs">.WEBA / .WEBM sources</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Audio-only WebM uploads arrive as WebM containers; they are accepted as sources and
+                      converted like any other audio file.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Video Section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                  <Video className="w-4 h-4 text-rose-400" /> Video Formats
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-rose-400 block text-xs">.MP4 / .MOV</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      .MP4 (H.264 + AAC, fast-start for web playback) and .MOV for Apple ecosystems. The
+                      universal choice for sharing and editing.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-rose-400 block text-xs">.WEBM / .MKV</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      .WEBM pairs VP9 video with Opus audio for open-format browsers; .MKV (Matroska) is a
+                      flexible container for archiving and remuxing.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-slate-200 block text-xs">.AVI / .FLV sources</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Legacy .AVI and .FLV files are accepted as sources (MPEG-4 + MP3 / Flash-era uploads)
+                      and converted into a modern container. .FLV is a source only.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-amber-400 block text-xs">.GIF clips</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Turn a video clip into an animated GIF with a generated colour palette. Best for short,
+                      silent loops — GIF carries no audio.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-purple-400 block text-xs">
+                      Extract .MP3 / .WAV / .OGG / .AAC / .FLAC / .M4A
+                    </span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Pull the audio track out of any video: lossy MP3, OGG, AAC and M4A, or lossless WAV and
+                      FLAC. Resolution, fps and mute do not apply to these targets — the video stream is
+                      dropped.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Document Section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-teal-400" /> Document Formats
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-teal-400 block text-xs">.MD → .HTML</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Markdown becomes a standalone .HTML page: headings, bold/italic and links are rendered,
+                      output is HTML-escaped, and link targets are limited to http, https and mailto.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-teal-400 block text-xs">.HTML / .TXT sources</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      HTML (and .HTM) sources are stripped of markup and converted to plain .TXT. HTML →
+                      Markdown is deliberately not offered: no HTML parser is integrated, so passing markup
+                      through as Markdown would misrepresent the result.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-slate-200 block text-xs">No PDF, either way</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      PDF is neither a source nor a target — no PDF engine is integrated. Convert to .TXT, .MD
+                      or .HTML instead.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -131,9 +238,18 @@ export const FormatGuide: React.FC<FormatGuideProps> = ({ isOpen, onClose }) => 
                     </p>
                   </div>
                   <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
-                    <span className="font-black text-teal-400 block text-xs">.YAML / .XML</span>
+                    <span className="font-black text-teal-400 block text-xs">.TSV ↔ .JSON / .CSV</span>
                     <p className="text-slate-300 leading-relaxed">
-                      Used for system configurations, web services, and enterprise data exchange formats.
+                      Tab-separated tables run through the same engine as CSV, so .TSV converts to and from
+                      JSON, CSV, XML and YAML.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-white/10 bg-white/5 space-y-1">
+                    <span className="font-black text-teal-400 block text-xs">.YAML / .XML (output only)</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Generated from parsed JSON, CSV or TSV for system configurations and enterprise data
+                      exchange. They are output-only here: no XML/YAML parser is integrated, so they cannot be
+                      used as sources.
                     </p>
                   </div>
                 </div>

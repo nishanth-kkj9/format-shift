@@ -59,7 +59,10 @@ convertRouter.post("/", async (req, res) => {
     const targetFormat = upload.targetFormat.toLowerCase();
     const plan = planConversion(registryCategory, targetFormat, upload.sourceFormat.toLowerCase());
     if (plan.supported === false) {
-      throw new UnsupportedConversionError(category, targetFormat);
+      // Surface the registry's own reason: it names the real pair ("html files
+      // cannot be converted to md") instead of a generic message, and the client
+      // shows this text verbatim to the user (see src/utils/serverConvert.ts).
+      throw new UnsupportedConversionError(category, targetFormat, plan.reason);
     }
 
     // Validate source format resolved from magic bytes / mime / filename against

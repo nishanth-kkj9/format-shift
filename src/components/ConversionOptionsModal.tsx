@@ -1,7 +1,17 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useDialogFocus } from "../hooks/useDialogFocus";
-import { X, RotateCw, FlipHorizontal, FlipVertical, Sliders, Check, ShieldCheck, Share2 } from "lucide-react";
+import {
+  X,
+  RotateCw,
+  FlipHorizontal,
+  FlipVertical,
+  Sliders,
+  Check,
+  ShieldCheck,
+  Share2,
+  Music,
+} from "lucide-react";
 import {
   ConversionItem,
   ImageConversionOptions,
@@ -11,6 +21,7 @@ import {
   SocialMediaPreset,
 } from "../types";
 import { SOCIAL_PRESETS } from "../utils/converter";
+import { optionVisibility } from "./optionGating";
 
 interface ConversionOptionsModalProps {
   item: ConversionItem;
@@ -65,6 +76,12 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
       indentSpaces: 2,
     }
   );
+
+  // Registry-driven gating: never offer a knob the selected target cannot honor
+  // (svg/gif/bmp/ico ignore quality, in-browser wav ignores bitrate, and
+  // audio-extraction targets drop the video stream entirely). Contract-tested in
+  // src/core/consistency.test.ts.
+  const visibility = optionVisibility(item.category, item.targetFormat);
 
   const handleSave = () => {
     onSaveOptions(item.id, {
@@ -167,23 +184,27 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                     </select>
                   </div>
 
-                  {/* Quality Slider */}
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-slate-200">Image Quality / Compression</label>
-                      <span className="text-xs font-extrabold text-indigo-400 font-mono px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-400/30">
-                        {imageOpts.quality}%
-                      </span>
+                  {/* Quality Slider — hidden when the encoder ignores it (svg, gif, bmp, ico) */}
+                  {visibility.quality && (
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-slate-200">
+                          Image Quality / Compression
+                        </label>
+                        <span className="text-xs font-extrabold text-indigo-400 font-mono px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-400/30">
+                          {imageOpts.quality}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        value={imageOpts.quality}
+                        onChange={(e) => setImageOpts({ ...imageOpts, quality: parseInt(e.target.value) })}
+                        className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
+                      />
                     </div>
-                    <input
-                      type="range"
-                      min="10"
-                      max="100"
-                      value={imageOpts.quality}
-                      onChange={(e) => setImageOpts({ ...imageOpts, quality: parseInt(e.target.value) })}
-                      className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
-                    />
-                  </div>
+                  )}
 
                   {/* EXIF / metadata handling is inherent to the pipeline */}
                   <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
@@ -348,25 +369,28 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
               {/* AUDIO OPTIONS */}
               {item.category === "audio" && (
                 <div className="space-y-5">
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">Target Audio Bitrate</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {(["128k", "192k", "256k", "320k"] as const).map((b) => (
-                        <button
-                          key={b}
-                          type="button"
-                          onClick={() => setAudioOpts({ ...audioOpts, bitrate: b })}
-                          className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                            audioOpts.bitrate === b
-                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
-                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
-                          }`}
-                        >
-                          {b}
-                        </button>
-                      ))}
+                  {/* Target bitrate — hidden for in-browser wav, which is always PCM 16-bit */}
+                  {visibility.quality && (
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                      <label className="text-xs font-bold text-slate-200 block">Target Audio Bitrate</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {(["128k", "192k", "256k", "320k"] as const).map((b) => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => setAudioOpts({ ...audioOpts, bitrate: b })}
+                            className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                              audioOpts.bitrate === b
+                                ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                                : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
+                            }`}
+                          >
+                            {b}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                     <label className="text-xs font-bold text-slate-200 block">
@@ -391,64 +415,82 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
               {/* VIDEO OPTIONS */}
               {item.category === "video" && (
                 <div className="space-y-5">
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">Target Resolution</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(
-                        [
-                          { label: "Original", val: "original" },
-                          { label: "1080p Full HD", val: "1080p" },
-                          { label: "720p HD", val: "720p" },
-                          { label: "480p SD", val: "480p" },
-                        ] as const
-                      ).map((r) => (
-                        <button
-                          key={r.val}
-                          type="button"
-                          onClick={() => setVideoOpts({ ...videoOpts, resolution: r.val })}
-                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                            videoOpts.resolution === r.val
-                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
-                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
-                          }`}
-                        >
-                          {r.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  {visibility.videoShape ? (
+                    <>
+                      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                        <label className="text-xs font-bold text-slate-200 block">Target Resolution</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(
+                            [
+                              { label: "Original", val: "original" },
+                              { label: "1080p Full HD", val: "1080p" },
+                              { label: "720p HD", val: "720p" },
+                              { label: "480p SD", val: "480p" },
+                            ] as const
+                          ).map((r) => (
+                            <button
+                              key={r.val}
+                              type="button"
+                              onClick={() => setVideoOpts({ ...videoOpts, resolution: r.val })}
+                              className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                videoOpts.resolution === r.val
+                                  ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                                  : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
+                              }`}
+                            >
+                              {r.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <label className="text-xs font-bold text-slate-200 block">Target Frame Rate (FPS)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([24, 30, 60] as const).map((fps) => (
-                        <button
-                          key={fps}
-                          type="button"
-                          onClick={() => setVideoOpts({ ...videoOpts, fps: fps })}
-                          className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                            videoOpts.fps === fps
-                              ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
-                              : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
-                          }`}
-                        >
-                          {fps} FPS
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                        <label className="text-xs font-bold text-slate-200 block">
+                          Target Frame Rate (FPS)
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([24, 30, 60] as const).map((fps) => (
+                            <button
+                              key={fps}
+                              type="button"
+                              onClick={() => setVideoOpts({ ...videoOpts, fps: fps })}
+                              className={`py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                videoOpts.fps === fps
+                                  ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                                  : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
+                              }`}
+                            >
+                              {fps} FPS
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  <label className="flex items-center gap-2 cursor-pointer p-3 rounded-2xl bg-white/5 border border-white/10">
-                    <input
-                      type="checkbox"
-                      checked={videoOpts.muteAudio}
-                      onChange={(e) => setVideoOpts({ ...videoOpts, muteAudio: e.target.checked })}
-                      className="rounded accent-indigo-500 w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-xs font-bold text-slate-200">
-                      Mute audio track (Mute audio output)
-                    </span>
-                  </label>
+                      <label className="flex items-center gap-2 cursor-pointer p-3 rounded-2xl bg-white/5 border border-white/10">
+                        <input
+                          type="checkbox"
+                          checked={videoOpts.muteAudio}
+                          onChange={(e) => setVideoOpts({ ...videoOpts, muteAudio: e.target.checked })}
+                          className="rounded accent-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-slate-200">
+                          Mute audio track (Mute audio output)
+                        </span>
+                      </label>
+                    </>
+                  ) : (
+                    // Audio-extraction targets drop the video stream, so the geometry knobs cannot apply.
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 flex items-start gap-3">
+                      <Music className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-indigo-200">Audio-only output</p>
+                        <p className="text-[11px] text-slate-300/80 leading-relaxed">
+                          This target keeps the audio track only, so resolution, frame rate and mute do not
+                          apply — the video stream is dropped during conversion.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

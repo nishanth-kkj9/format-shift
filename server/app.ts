@@ -172,6 +172,14 @@ app.get("/api/ready", (_req, res) => {
 app.use("/api/convert", convertRouter);
 app.use("/api/code-template", templatesRouter);
 
+// Unmatched /api/* routes (wrong method, unknown path) answer with a JSON 404.
+// Every /api consumer is a programmatic client, so Express's default HTML 404
+// and the SPA index fallback are both wrong shapes for this namespace. Mounted
+// before the static/SPA handlers so /api/* can never leak index.html.
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 // Serve built frontend (production). No-op in dev — dist/ may not exist yet.
 const distDir = path.resolve("dist");
 if (fs.existsSync(path.join(distDir, "index.html"))) {

@@ -5,3 +5,4 @@ package-lock.json
 bun.lock
 probe
 *.log
+docs/format-matrix.md

@@ -1,15 +1,21 @@
 import { TargetFormat, ImageConversionOptions } from "../types";
 import { SOCIAL_PRESETS } from "./detect";
-import { getMimeForTarget } from "../core/conversionRegistry";
+import { getAvailableTargets, getMimeForTarget, needsServerEngine } from "../core/conversionRegistry";
 
 export { dataUrlToBlob };
 
 // Targets that must run on the FFmpeg server — the browser canvas cannot
-// reliably encode these. Rejecting here prevents silently mislabeled output.
-const SERVER_ONLY_IMAGE_TARGETS = new Set(["gif", "bmp", "ico", "avif"]);
+// reliably encode these. Derived from the registry's engine flag so the client
+// can never advertise something different from what it routes; a drift test
+// (src/core/consistency.test.ts) pins both directions.
+const SERVER_ONLY_IMAGE_TARGETS = new Set(
+  getAvailableTargets("image").filter((target) => needsServerEngine("image", target))
+);
 
 // Browser-supported targets (Canvas can encode these).
-const BROWSER_IMAGE_TARGETS = new Set(["png", "jpg", "jpeg", "webp", "svg"]);
+const BROWSER_IMAGE_TARGETS = new Set(
+  getAvailableTargets("image").filter((target) => !needsServerEngine("image", target))
+);
 
 function assertBlobMatches(blob: Blob | null, target: string): void {
   const expected = getMimeForTarget("image", target);

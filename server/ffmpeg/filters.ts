@@ -53,6 +53,11 @@ export function imageArgs(opts: ConvertOptions): string[] {
   // codec, image2 defaults to mjpeg when the output path has no extension.
   const codec = imageCodec(tgt);
   const codecArgs = codec ? ["-c:v", codec] : [];
+  // Every image target except GIF can hold exactly one frame, and the bmp/ico/
+  // image2 muxers abort ("Conversion failed!") when an animated GIF source keeps
+  // feeding them frames — so an animated source is pinned to its first frame.
+  // GIF output keeps all frames.
+  const frameArgs = tgt === "gif" ? [] : ["-frames:v", "1"];
   const outFmt =
     tgt === "gif"
       ? ["-f", "gif"]
@@ -61,7 +66,7 @@ export function imageArgs(opts: ConvertOptions): string[] {
         : tgt === "jpg"
           ? ["-f", "mjpeg"]
           : ["-f", "image2"];
-  return [...imageFilters(opts), ...codecArgs, ...outFmt];
+  return [...imageFilters(opts), ...frameArgs, ...codecArgs, ...outFmt];
 }
 
 /** Image encoder name per target (null = leave to the muxer's default). */

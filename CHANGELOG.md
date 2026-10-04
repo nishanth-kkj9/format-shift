@@ -17,6 +17,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   always suggesting an image toolchain, and the modal labels them as generic.
 - Tests for the snippets fallback + tab semantics, and pressed-state coverage for
   the options modal flip toggles.
+- Full-matrix correctness audit built from `src/core/conversionRegistry.ts`: a generated
+  server matrix (`server/matrix.test.ts` + `server/testFixtures.ts`) runs every
+  server-engine pair through the real Express app with real ffmpeg and probes the output
+  (magic bytes, MIME, `ftyp` brands, round-trips), and browser-engine pair proofs cover
+  every data/document/audio/image pair on its declared engine — each of the 216 advertised
+  pairs now has an automated pass or exclusion assertion.
+- Registry drift guard `src/core/consistency.test.ts`: pins formatMeta, the FormatGuide
+  cheat sheet, the upload MIME map, codec tables, option gating, client engine routing and
+  the generated docs to the registry, so no hand-maintained surface can silently fall behind.
+- `npm run matrix:docs` + `docs/format-matrix.md`: the format conversion matrix is now
+  generated from the registry; a consistency test fails if the doc's numbers drift.
+- Endpoint contract tests: unknown `/api/*` routes and wrong-method hits answer with a
+  JSON 404 (`server/app.ts`), never Express's HTML 404 or the SPA index fallback.
+- E2E flows for json→csv and md→html (browser engine) and wav→mp3 (server engine),
+  including a generated PCM WAV fixture.
+
+### Changed
+
+- Image target sets and the options modal are now derived from the registry instead of
+  duplicated per-source lists; option gating moved to `src/components/optionGating.ts`.
+- `svg` sources no longer advertise server-engine image targets (`gif`, `bmp`, `ico`,
+  `avif`): no integrated ffmpeg build can decode SVG, so those pairs are honest 400s
+  instead of guaranteed runtime failures.
 
 ### Fixed
 

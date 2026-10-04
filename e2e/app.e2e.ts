@@ -14,6 +14,40 @@ const makePngFixture = (): string => {
   return file;
 };
 
+// Minimal valid PCM WAV (sine tone stands in as raw PCM): RIFF header + 16-bit
+// mono 8kHz samples. Enough for ffmpeg -> libmp3lame in the server e2e path.
+const makeWavFixture = (): string => {
+  const sampleRate = 8000;
+  const numSamples = sampleRate / 5; // 0.2 s
+  const dataSize = numSamples * 2;
+  const buf = Buffer.alloc(44 + dataSize);
+  buf.write("RIFF", 0);
+  buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write("WAVE", 8);
+  buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16); // fmt chunk size
+  buf.writeUInt16LE(1, 20); // PCM
+  buf.writeUInt16LE(1, 22); // mono
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  buf.writeUInt16LE(2, 32); // block align
+  buf.writeUInt16LE(16, 34); // bits per sample
+  buf.write("data", 36);
+  buf.writeUInt32LE(dataSize, 40);
+  for (let i = 0; i < numSamples; i++) {
+    buf.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 8000), 44 + i * 2);
+  }
+  const file = join(mkdtempSync(join(tmpdir(), "format-shift-e2e-")), "tone.wav");
+  writeFileSync(file, buf);
+  return file;
+};
+
+const makeTextFixture = (name: string, content: string): string => {
+  const file = join(mkdtempSync(join(tmpdir(), "format-shift-e2e-")), name);
+  writeFileSync(file, content, "utf8");
+  return file;
+};
+
 const DROPDOWN = "button[aria-haspopup='listbox']";
 
 const convertSelectedFile = async (page: Page, targetFormat: string) => {
@@ -141,5 +175,58 @@ test.describe("FormatShift critical user flows", () => {
 
     await dialog.press("Escape");
     await expect(dialog).toBeHidden();
+  });
+
+  test("json -> csv browser conversion completes with a Save control", async ({ page }) => {
+    await page.goto("/");
+
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("region", { name: /Drag & Drop/i }).click(),
+    ]);
+    await chooser.setFiles(makeTextFixture("data.json", '[{"name":"Ada","lang":"ts"}]'));
+    await expect(page.getByText("data.json")).toBeVisible();
+    await expect(page.getByText("DATA", { exact: true })).toBeVisible();
+
+    await convertSelectedFile(page, "csv");
+    await page.getByRole("button", { name: "Convert", exact: true }).click();
+
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible({ timeout: 30_000 });
+  });
+
+  test("md -> html browser conversion completes with a Save control", async ({ page }) => {
+    await page.goto("/");
+
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("region", { name: /Drag & Drop/i }).click(),
+    ]);
+    await chooser.setFiles(makeTextFixture("note.md", "# Heading\n\nBody **bold** text."));
+    await expect(page.getByText("note.md")).toBeVisible();
+    await expect(page.getByText("DOCUMENT", { exact: true })).toBeVisible();
+
+    await convertSelectedFile(page, "html");
+    await page.getByRole("button", { name: "Convert", exact: true }).click();
+
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible({ timeout: 30_000 });
+  });
+
+  test("audio wav -> mp3 server conversion completes with a Save control", async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto("/");
+
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("region", { name: /Drag & Drop/i }).click(),
+    ]);
+    await chooser.setFiles(makeWavFixture());
+    await expect(page.getByText("tone.wav")).toBeVisible();
+    await expect(page.getByText("AUDIO", { exact: true })).toBeVisible();
+
+    await convertSelectedFile(page, "mp3");
+    await page.getByRole("button", { name: "Convert", exact: true }).click();
+
+    // Server-engine path: ffmpeg runs in the backend before Save appears.
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible({ timeout: 60_000 });
   });
 });

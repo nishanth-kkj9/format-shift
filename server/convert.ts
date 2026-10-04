@@ -21,8 +21,9 @@ export class UnsupportedFormatError extends Error {
 }
 
 export class UnsupportedConversionError extends Error {
-  constructor(category: string, target: string) {
-    super(`Conversion not supported for ${category} -> ${target}`);
+  /** `reason` is the registry's own explanation when one is available. */
+  constructor(category: string, target: string, reason?: string) {
+    super(reason ?? `Conversion not supported for ${category} -> ${target}`);
     this.name = "UnsupportedConversionError";
   }
 }

@@ -17,6 +17,7 @@ export default defineConfig({
         "src/core/conversionRegistry.ts",
         "server/upload.ts",
         "server/convert.ts",
+        "server/testFixtures.ts",
         "server/ffmpeg/runner.ts",
         "server/routes/convert.ts",
         "src/components/FileList.tsx",

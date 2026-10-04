@@ -82,15 +82,15 @@ describe("ConversionOptionsModal", () => {
     expect(h.onClose).toHaveBeenCalled();
   });
 
-  it("saves audio bitrate changes for an audio item", async () => {
+  it("saves audio bitrate changes for a server-encoded audio target", async () => {
     const user = userEvent.setup();
     const h = renderModal(
       makeItem({
         category: "audio",
-        name: "song.mp3",
-        originalExtension: "mp3",
-        targetFormat: "wav",
-        availableTargets: ["wav"],
+        name: "song.wav",
+        originalExtension: "wav",
+        targetFormat: "mp3",
+        availableTargets: ["mp3"],
         options: {},
       })
     );
@@ -200,5 +200,59 @@ describe("ConversionOptionsModal", () => {
     await user.click(flipHorizontal);
     expect(flipHorizontal).toHaveAttribute("aria-pressed", "true");
     expect(flipVertical).toHaveAttribute("aria-pressed", "false");
+  });
+
+  // Registry capabilities drive the gating (src/components/optionGating.ts): a
+  // control that cannot affect the selected target must not be offered.
+  it("hides the bitrate control for in-browser wav, where it has no effect", async () => {
+    const user = userEvent.setup();
+    const h = renderModal(
+      makeItem({
+        category: "audio",
+        name: "song.mp3",
+        originalExtension: "mp3",
+        targetFormat: "wav",
+        availableTargets: ["wav"],
+        options: {},
+      })
+    );
+
+    expect(screen.queryByRole("button", { name: /^320k$/ })).not.toBeInTheDocument();
+    // The knobs the Web Audio pipeline does honour stay available.
+    expect(screen.getByText(/Output Gain/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Save Settings/ }));
+    const [, saved] = h.onSaveOptions.mock.calls[0];
+    expect(saved.audio).toMatchObject({ bitrate: "192k" });
+  });
+
+  it("hides the image quality slider for targets whose encoder ignores it", () => {
+    renderModal(makeItem({ targetFormat: "svg", availableTargets: ["svg"] }));
+    expect(screen.queryByText(/Image Quality \/ Compression/i)).not.toBeInTheDocument();
+    // Layout controls still apply to the raster-wrapped output.
+    expect(screen.getByText(/Social Media Resizer Presets/i)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Convert to Grayscale/i })).toBeInTheDocument();
+  });
+
+  it("keeps the quality slider for targets that honour it", () => {
+    renderModal(makeItem({ targetFormat: "jpg", availableTargets: ["jpg"] }));
+    expect(screen.getByText(/Image Quality \/ Compression/i)).toBeInTheDocument();
+  });
+
+  it("replaces the video geometry controls with an audio-only notice for extraction targets", () => {
+    renderModal(
+      makeItem({
+        category: "video",
+        name: "clip.mp4",
+        originalExtension: "mp4",
+        targetFormat: "mp3",
+        availableTargets: ["mp3"],
+        options: {},
+      })
+    );
+    expect(screen.queryByText(/Target Resolution/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Target Frame Rate/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Mute audio track/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Audio-only output/i)).toBeInTheDocument();
   });
 });

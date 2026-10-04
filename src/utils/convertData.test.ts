@@ -179,3 +179,82 @@ describe("convertDataDocument", () => {
     );
   });
 });
+
+// Every advertised document pair (src/core/conversionRegistry.ts document
+// category) with its explicitly defined expected semantics. Derived pair counts
+// are pinned in src/core/consistency.test.ts.
+describe("document pair semantics", () => {
+  const HTML_DOC =
+    "<html><head><style>p{color:red}</style></head><body><h1>Title</h1><p>Hello <b>world</b></p><script>alert(1)</script></body></html>";
+
+  it("txt -> txt: identity passthrough", async () => {
+    const { blob, convertedText } = await convertDataDocument(
+      makeFile("plain notes\nline 2", "notes.txt"),
+      "txt"
+    );
+    expect(convertedText).toBe("plain notes\nline 2");
+    expect(blob.type).toBe("text/plain");
+  });
+
+  it("txt -> md: identity passthrough (plain text is valid Markdown)", async () => {
+    const { convertedText } = await convertDataDocument(
+      makeFile("# not a heading\nplain", "notes.txt"),
+      "md"
+    );
+    expect(convertedText).toBe("# not a heading\nplain");
+  });
+
+  it("txt -> html: wrapped into a Markdown-rendered HTML document", async () => {
+    const { convertedText, blob } = await convertDataDocument(makeFile("# Title", "notes.txt"), "html");
+    expect(convertedText).toContain("<!DOCTYPE html>");
+    expect(convertedText).toContain("<h1>Title</h1>");
+    expect(blob.type).toBe("text/html");
+  });
+
+  it("md -> txt: identity passthrough (Markdown is already plain text)", async () => {
+    const { convertedText } = await convertDataDocument(makeFile("# Title\n**bold**", "readme.md"), "txt");
+    expect(convertedText).toBe("# Title\n**bold**");
+  });
+
+  it("md -> md: identity passthrough", async () => {
+    const { blob, convertedText } = await convertDataDocument(makeFile("# Title", "readme.md"), "md");
+    expect(convertedText).toBe("# Title");
+    expect(blob.type).toBe("text/markdown");
+  });
+
+  it("html -> txt: markup, scripts and entities are stripped", async () => {
+    const { blob, convertedText } = await convertDataDocument(makeFile(HTML_DOC, "page.html"), "txt");
+    expect(convertedText).toBe("Title\nHello world");
+    expect(convertedText).not.toMatch(/[<>]/);
+    expect(convertedText).not.toContain("alert(1)");
+    expect(blob.type).toBe("text/plain");
+  });
+
+  it("htm -> txt: same strip, with entities decoded last", async () => {
+    const { convertedText } = await convertDataDocument(
+      makeFile("<p>Tom &amp; Jerry &lt;3</p>", "page.htm"),
+      "txt"
+    );
+    expect(convertedText).toBe("Tom & Jerry <3");
+  });
+
+  it("html -> html: kept verbatim instead of being escaped into a second document", async () => {
+    const { blob, convertedText } = await convertDataDocument(makeFile(HTML_DOC, "page.html"), "html");
+    expect(convertedText).toBe(HTML_DOC);
+    expect(blob.type).toBe("text/html");
+  });
+
+  it("htm -> html: normalized to the same verbatim document", async () => {
+    const { convertedText } = await convertDataDocument(makeFile("<p>x</p>", "page.htm"), "html");
+    expect(convertedText).toBe("<p>x</p>");
+  });
+
+  it("strips markup even when the HTML also looks tabular", async () => {
+    // A multi-line HTML table would otherwise be misread as CSV and passed
+    // through verbatim as "plain text".
+    const table = "<table>\n<tr><td>a,b</td></tr>\n<tr><td>c,d</td></tr>\n</table>";
+    const { convertedText } = await convertDataDocument(makeFile(table, "table.html"), "txt");
+    expect(convertedText).not.toMatch(/[<>]/);
+    expect(convertedText).toContain("a,b");
+  });
+});

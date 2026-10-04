@@ -183,6 +183,13 @@ export const CONVERSION_REGISTRY: Record<FileCategory, CategorySpec> = {
     category: "image",
     sourceFormats: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "svg", "avif"],
     targets: IMAGE_TARGETS,
+    // No integrated ffmpeg build can decode SVG (verified against both the
+    // bundled ffmpeg-static binary and Debian's package: "Decoding requested,
+    // but no decoder found for: svg" — librsvg is not an ffmpeg dependency), so
+    // a vector source can only ever be handled by the browser canvas. Routing
+    // these pairs to the server would fail after upload; excluding them keeps
+    // the advertised matrix honest.
+    excludedTargetsBySource: { svg: ["gif", "bmp", "ico", "avif"] },
     defaultTarget: (source) =>
       source === "png" ? "jpg" : source === "jpg" || source === "jpeg" ? "webp" : "png",
   },

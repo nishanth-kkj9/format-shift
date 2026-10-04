@@ -158,7 +158,8 @@ describe("POST /api/convert (error paths + requestId)", () => {
     const res = await postConvert(new Blob([TINY_PNG]), "test.png", "image", "pdf");
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/Conversion not supported/);
+    // The registry's own reason is surfaced verbatim — it names the real pair.
+    expect(body.error).toMatch(/No pdf conversion is supported/);
     expect(typeof body.requestId).toBe("string");
   }, 30000);
 
@@ -193,7 +194,7 @@ describe("POST /api/convert (error paths + requestId)", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/Conversion not supported/);
+    expect(body.error).toMatch(/html files cannot be converted to md/);
     expect(typeof body.requestId).toBe("string");
   }, 30000);
 
@@ -515,6 +516,44 @@ describe("Ready endpoint", () => {
   });
 });
 
+describe("API contract: unmatched /api/* routes and wrong methods", () => {
+  const expectJson404 = async (res: Response) => {
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const body = (await res.json()) as { error?: string };
+    expect(typeof body.error).toBe("string");
+    // Never the SPA index fallback, which would answer with HTML.
+    expect(res.headers.get("content-type")).not.toContain("text/html");
+  };
+
+  it("returns a JSON 404 for an unknown /api/* path via GET", async () => {
+    await expectJson404(await fetch(`${base}/api/nope`));
+  }, 30000);
+
+  it("returns a JSON 404 for an unknown /api/* path via POST", async () => {
+    await expectJson404(
+      await fetch(`${base}/api/nope`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      })
+    );
+  }, 30000);
+
+  it("returns a JSON 404 for a wrong-method hit on /api/convert (never the SPA fallback)", async () => {
+    await expectJson404(await fetch(`${base}/api/convert`));
+  }, 30000);
+
+  it("returns a JSON 404 for a wrong-method hit on /api/health (the existing urlencoded test path)", async () => {
+    const res = await fetch(`${base}/api/health`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "a=1",
+    });
+    await expectJson404(res);
+  }, 30000);
+});
+
 describe("Security headers", () => {
   it("includes X-Frame-Options DENY", async () => {
     const res = await fetch(`${base}/api/health`);
@@ -639,7 +678,7 @@ describe("Server-side source conversions (source-format validation)", () => {
       const res = await postAudio(toneMp3, "tone.mp3", "audio/mpeg", target);
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error).toMatch(/Conversion not supported for audio -> (mp4|webm)/);
+      expect(body.error).toMatch(new RegExp(`No ${target} conversion is supported for audio`));
       expect(typeof body.requestId).toBe("string");
     }
   }, 30000);

@@ -23,7 +23,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "matrix:docs": "tsx scripts/generate-format-matrix.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

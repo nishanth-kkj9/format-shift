@@ -33,6 +33,12 @@ export const FORMAT_META: Record<FileCategory, Record<string, FormatMetaEntry>> 
       icon: Image,
       description: "Best for standard photos & web",
     },
+    jpeg: {
+      label: "JPEG (.jpeg)",
+      badge: "Universal",
+      icon: Image,
+      description: "Same JPEG encoder, .jpeg extension",
+    },
     png: {
       label: "PNG Image",
       badge: "Lossless",
@@ -109,6 +115,18 @@ export const FORMAT_META: Record<FileCategory, Record<string, FormatMetaEntry>> 
       badge: "Audio Only",
       icon: Music,
       description: "Extract AAC audio from video",
+    },
+    m4a: {
+      label: "Extract M4A",
+      badge: "Apple AAC",
+      icon: Music,
+      description: "Extract AAC audio in an MP4 container",
+    },
+    flac: {
+      label: "Extract FLAC",
+      badge: "Studio",
+      icon: Disc,
+      description: "Extract lossless FLAC audio from video",
     },
   },
   data: {
