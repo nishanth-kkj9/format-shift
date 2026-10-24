@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { ConversionOptionsModal } from "./ConversionOptionsModal";
@@ -163,6 +163,18 @@ describe("ConversionOptionsModal", () => {
       flipVertical: true,
       grayscale: true,
     });
+  });
+
+  it("collects crop and color adjustments into saved image options", async () => {
+    const user = userEvent.setup();
+    const h = renderModal(makeItem());
+
+    fireEvent.change(screen.getByLabelText("Width %"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Brightness"), { target: { value: "20" } });
+    await user.click(screen.getByRole("button", { name: /Save Settings/ }));
+
+    const [, saved] = h.onSaveOptions.mock.calls[0];
+    expect(saved.image).toMatchObject({ cropWidth: 50, brightness: 20 });
   });
 
   it("saves resolution, fps and mute choices for video items", async () => {

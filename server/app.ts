@@ -180,9 +180,25 @@ app.use("/api", (_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
+/**
+ * dist/ also contains the production server bundle and its source map (both
+ * needed at runtime by `node dist/server.cjs`). They must never be reachable as
+ * static assets, or every visitor can download the server code and its sources.
+ */
+export function isPrivateDistAsset(urlPath: string): boolean {
+  return urlPath === "/server.cjs" || urlPath === "/server.cjs.map";
+}
+
 // Serve built frontend (production). No-op in dev — dist/ may not exist yet.
 const distDir = path.resolve("dist");
 if (fs.existsSync(path.join(distDir, "index.html"))) {
+  app.use((req, res, next) => {
+    if (isPrivateDistAsset(req.path)) {
+      res.status(404).end();
+      return;
+    }
+    next();
+  });
   app.use(express.static(distDir));
   app.get("/{*splat}", (req, res, next) => {
     if (req.path.startsWith("/api/")) return next();

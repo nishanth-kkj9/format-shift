@@ -119,6 +119,21 @@ export interface FFmpegRunOptions {
   signal?: AbortSignal | undefined;
   /** kill the child process if it runs longer than this (ms) */
   timeoutMs?: number | undefined;
+  /** input duration in seconds; required to turn ffmpeg's out_time into a percent */
+  durationSeconds?: number | undefined;
+  /** called with 0-99 as encoding progresses (never 100; completion is the promise resolving) */
+  onProgress?: ((percent: number) => void) | undefined;
+}
+
+/**
+ * Read the media timestamp out of one `-progress` key=value line.
+ * Both `out_time_us` and the legacy `out_time_ms` are microseconds in practice
+ * (the `_ms` name is a long-standing ffmpeg misnomer); non-numeric values such
+ * as `N/A` return null.
+ */
+export function parseProgressMicroseconds(line: string): number | null {
+  const m = /^out_time_(?:us|ms)=(\d+)$/.exec(line.trim());
+  return m ? Number(m[1]) : null;
 }
 
 /**
@@ -224,7 +239,7 @@ export function releaseFFmpegSlot(): void {
 export function sanitizeFfmpegStderr(stderr: string): string {
   return stderr
     .replace(/\s*@\s*0x[0-9a-f]+/gi, "")
-    .replace(/(?:[A-Za-z]:)?[\\/][^\\/\s]*[\\/][^\\/\s]*/g, "…")
+    .replace(/(?<![:/])(?:[A-Za-z]:)?(?:[\\/][^\s\\]+){2,}/g, "…")
     .split("\n")
     .filter(Boolean)
     .slice(-3)
@@ -299,6 +314,9 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
     proc = spawn(FFMPEG_BIN, [
       "-hide_banner",
       "-nostdin",
+      "-progress",
+      "pipe:1",
+      "-nostats",
       ...inputArgs,
       ...args,
       "-max_muxing_queue_size",
@@ -306,6 +324,29 @@ function runFFmpegInner(args: string[], opts: FFmpegRunOptions): Promise<FFmpegR
       outPath,
     ]);
     proc.stderr?.on("data", (c: Buffer) => err.push(c));
+
+    // Report progress only when the caller supplied a duration estimate;
+    // otherwise there is nothing to divide by. Percent is capped at 99 so the
+    // UI can't claim completion before the output file is fully written.
+    const totalSeconds = opts.durationSeconds;
+    if (opts.onProgress && totalSeconds && totalSeconds > 0) {
+      let pending = "";
+      let lastPercent = -1;
+      proc.stdout?.on("data", (chunk: Buffer) => {
+        pending += chunk.toString("utf8");
+        const lines = pending.split("\n");
+        pending = lines.pop() ?? "";
+        for (const line of lines) {
+          const micros = parseProgressMicroseconds(line);
+          if (micros === null) continue;
+          const percent = Math.min(99, Math.floor((micros / 1_000_000 / totalSeconds) * 100));
+          if (percent > lastPercent) {
+            lastPercent = percent;
+            opts.onProgress?.(percent);
+          }
+        }
+      });
+    }
 
     // Kill a runaway encoder whose output file outgrows the cap before it fills
     // the disk. The close handler's final size check is the authoritative

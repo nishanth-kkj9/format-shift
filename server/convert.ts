@@ -53,6 +53,13 @@ export interface ValidatedOptions {
   resolution?: string;
   fps?: number;
   muteAudio?: boolean;
+  cropX?: number;
+  cropY?: number;
+  cropWidth?: number;
+  cropHeight?: number;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
 }
 
 const VALID_RESOLUTIONS = new Set(["original", "1080p", "720p", "480p", "360p"]);
@@ -83,6 +90,13 @@ export const OPTIONS_SCHEMA = z
     resolution: z.string().optional(),
     fps: z.union([z.number(), z.string()]).optional(),
     muteAudio: z.boolean().optional(),
+    cropX: z.union([z.number(), z.string()]).optional(),
+    cropY: z.union([z.number(), z.string()]).optional(),
+    cropWidth: z.union([z.number(), z.string()]).optional(),
+    cropHeight: z.union([z.number(), z.string()]).optional(),
+    brightness: z.union([z.number(), z.string()]).optional(),
+    contrast: z.union([z.number(), z.string()]).optional(),
+    saturation: z.union([z.number(), z.string()]).optional(),
   })
   .strict();
 
@@ -169,6 +183,26 @@ export function validateOptions(opts: ConvertOptions): ValidatedOptions {
     validated.fps = f;
   }
   if (opts.muteAudio !== undefined) validated.muteAudio = Boolean(opts.muteAudio);
+  const pct = (
+    key: "cropX" | "cropY" | "cropWidth" | "cropHeight" | "brightness" | "contrast" | "saturation",
+    min: number
+  ) => {
+    if (opts[key] === undefined) return;
+    const n = Number(opts[key]);
+    if (!Number.isFinite(n) || n < min || n > 100) throw new InvalidOptionError(key, `must be ${min}-100`);
+    validated[key] = n;
+  };
+  pct("cropX", 0);
+  pct("cropY", 0);
+  pct("cropWidth", 1);
+  pct("cropHeight", 1);
+  pct("brightness", -100);
+  pct("contrast", -100);
+  pct("saturation", -100);
+  if (validated.cropWidth && validated.cropX !== undefined && validated.cropX + validated.cropWidth > 100)
+    throw new InvalidOptionError("cropWidth", "cropX + cropWidth must be <= 100");
+  if (validated.cropHeight && validated.cropY !== undefined && validated.cropY + validated.cropHeight > 100)
+    throw new InvalidOptionError("cropHeight", "cropY + cropHeight must be <= 100");
 
   return validated;
 }
@@ -190,6 +224,13 @@ export interface ConvertOptions {
   resolution?: string;
   fps?: number;
   muteAudio?: boolean;
+  cropX?: number;
+  cropY?: number;
+  cropWidth?: number;
+  cropHeight?: number;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
 }
 
 /** All target extensions the server can produce, derived from the shared registry. */
@@ -224,7 +265,7 @@ export async function convertFile(
   const mime = plan.target.mime;
 
   if (cat === "image") {
-    const result = await runFFmpeg(imageArgs(validated), { inputPath, signal: runOptions.signal });
+    const result = await runFFmpeg(imageArgs(validated), { ...runOptions, inputPath });
     return { data: Buffer.alloc(0), mime, result };
   }
 
@@ -232,14 +273,12 @@ export async function convertFile(
     // Guard against a registry/codec-map drift: if the target is registered but
     // has no encoder, fail loudly instead of crashing on a non-null assertion.
     if (!AUDIO_CODECS[tgt]) throw new UnsupportedConversionError(cat, tgt);
-    const result = await runFFmpeg(audioArgs(validated), { inputPath, signal: runOptions.signal }).catch(
-      (e: Error) => {
-        if (/does not contain any stream/i.test(e.message)) {
-          throw new NoAudioStreamError();
-        }
-        throw e;
+    const result = await runFFmpeg(audioArgs(validated), { ...runOptions, inputPath }).catch((e: Error) => {
+      if (/does not contain any stream/i.test(e.message)) {
+        throw new NoAudioStreamError();
       }
-    );
+      throw e;
+    });
     return { data: Buffer.alloc(0), mime, result };
   }
 
@@ -247,7 +286,7 @@ export async function convertFile(
     // Guard against a registry/codec-map drift: if the target is registered but
     // has no encoder, fail loudly instead of crashing on a non-null assertion.
     if (!VIDEO_CODECS[tgt]) throw new UnsupportedConversionError(cat, tgt);
-    const result = await runFFmpeg(videoArgs(validated), { inputPath, signal: runOptions.signal });
+    const result = await runFFmpeg(videoArgs(validated), { ...runOptions, inputPath });
     return { data: Buffer.alloc(0), mime, result };
   }
 

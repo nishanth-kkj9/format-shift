@@ -5,7 +5,27 @@ export function imageFilters(opts: ConvertOptions): string[] {
   const filters: string[] = [];
   const q = opts.quality ?? 90;
 
+  // Crop first, then everything else, so the result matches the client canvas
+  // pipeline (crop -> adjust -> rotate -> scale).
+  if (opts.cropWidth && opts.cropHeight && (opts.cropWidth < 100 || opts.cropHeight < 100)) {
+    const x = opts.cropX ?? 0;
+    const y = opts.cropY ?? 0;
+    // ponytail: percent crop, no pixel-perfect box UI. Swap to a draggable
+    // overlay if users need exact framing.
+    filters.push(`crop=iw*${opts.cropWidth / 100}:ih*${opts.cropHeight / 100}:iw*${x / 100}:ih*${y / 100}`);
+  }
   if (opts.grayscale) filters.push("format=gray");
+  // Brightness must multiply like CSS `brightness()`, so use a channel mixer
+  // (eq's brightness is additive and would not match the client canvas).
+  if (opts.brightness) {
+    const k = 1 + opts.brightness / 100;
+    filters.push(`colorchannelmixer=rr=${k}:gg=${k}:bb=${k}`);
+  }
+  if (opts.contrast || opts.saturation) {
+    const contrast = 1 + (opts.contrast ?? 0) / 100;
+    const saturation = 1 + (opts.saturation ?? 0) / 100;
+    filters.push(`eq=contrast=${contrast}:saturation=${saturation}`);
+  }
   if (opts.rotation) {
     // transpose: 1 = 90° clockwise, 2 = 90° counter-clockwise (270° CW).
     // 180° is two axis flips (a single transpose can only do 90°).

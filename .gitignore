@@ -28,3 +28,5 @@ test-2s.wav
 repomix-output.xml
 *.bak
 
+# editor/agent local state
+.serena/

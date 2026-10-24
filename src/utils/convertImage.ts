@@ -39,6 +39,36 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime });
 }
 
+/** CSS filter string for the -100..100 adjustment percentages (0 = no-op). */
+export function adjustmentFilter(options: ImageConversionOptions): string {
+  const parts: string[] = [];
+  if (options.brightness) parts.push(`brightness(${1 + options.brightness / 100})`);
+  if (options.contrast) parts.push(`contrast(${1 + options.contrast / 100})`);
+  if (options.saturation) parts.push(`saturate(${1 + options.saturation / 100})`);
+  return parts.join(" ");
+}
+
+/** Source rectangle for the percent crop, clamped to the image bounds. */
+function cropRect(
+  options: ImageConversionOptions,
+  width: number,
+  height: number
+): { sx: number; sy: number; sw: number; sh: number } | null {
+  const cw = options.cropWidth;
+  const ch = options.cropHeight;
+  if (!cw || !ch || (cw >= 100 && ch >= 100)) return null;
+  const x = Math.min(Math.max(options.cropX || 0, 0), 100);
+  const y = Math.min(Math.max(options.cropY || 0, 0), 100);
+  const w = Math.min(Math.max(cw, 1), 100 - x);
+  const h = Math.min(Math.max(ch, 1), 100 - y);
+  return {
+    sx: Math.round((x / 100) * width),
+    sy: Math.round((y / 100) * height),
+    sw: Math.max(1, Math.round((w / 100) * width)),
+    sh: Math.max(1, Math.round((h / 100) * height)),
+  };
+}
+
 /**
  * Guards a promise's resolve/reject against a caller-supplied AbortSignal:
  * - a signal already aborted (or an abort that arrives mid-operation) settles
@@ -134,6 +164,26 @@ export async function convertImage(
         let width = img.width;
         let height = img.height;
 
+        // Crop first: everything downstream (preset fit, resize, rotation)
+        // works on the cropped pixels, matching the server's filter order.
+        let source: CanvasImageSource = img;
+        const crop = cropRect(options, width, height);
+        if (crop) {
+          const cropCanvas = document.createElement("canvas");
+          cropCanvas.width = crop.sw;
+          cropCanvas.height = crop.sh;
+          const cropCtx = cropCanvas.getContext("2d");
+          if (!cropCtx) {
+            g.reject(new Error("Could not get canvas 2d context"));
+            return;
+          }
+          cropCtx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
+          source = cropCanvas;
+          width = crop.sw;
+          height = crop.sh;
+        }
+        const filter = adjustmentFilter(options) || "none";
+
         // Apply Social Media Preset dimensions if selected
         let presetDim: { w: number; h: number } | null = null;
         if (
@@ -173,7 +223,8 @@ export async function convertImage(
           ctx.translate(canvas.width / 2, canvas.height / 2);
           ctx.rotate((options.rotation * Math.PI) / 180);
           ctx.scale(options.flipHorizontal ? -1 : 1, options.flipVertical ? -1 : 1);
-          ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+          ctx.filter = filter;
+          ctx.drawImage(source, -drawW / 2, -drawH / 2, drawW, drawH);
           ctx.restore();
 
           // Grayscale filter
@@ -252,7 +303,8 @@ export async function convertImage(
         ctx.scale(options.flipHorizontal ? -1 : 1, options.flipVertical ? -1 : 1);
 
         // Draw image
-        ctx.drawImage(img, -width / 2, -height / 2, width, height);
+        ctx.filter = filter;
+        ctx.drawImage(source, -width / 2, -height / 2, width, height);
         ctx.restore();
 
         // Apply Grayscale if requested

@@ -12,6 +12,10 @@ import { ServerBusyError, OutputLimitError, FFmpegTimeoutError } from "../ffmpeg
 import type { ParsedUpload } from "../upload";
 import { planConversion, CONVERSION_REGISTRY } from "../../src/core/conversionRegistry";
 import { randomUUID } from "node:crypto";
+import { publishProgress, subscribeProgress } from "../progress";
+
+/** Client-generated id for the progress stream; opaque and bounded. */
+const PROGRESS_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 // Simple structured logger for conversion errors.
 function logError(context: Record<string, unknown>): void {
@@ -32,6 +36,37 @@ export const convertRouter = Router();
 function errorResponse(res: Response, status: number, message: string, requestId: string): void {
   res.status(status).json({ error: message, requestId });
 }
+
+// Server-sent progress stream for one conversion. The client opens this first,
+// then POSTs /api/convert with the same id in X-Progress-Id. Best-effort: if the
+// stream drops, the conversion still completes and the client just loses the
+// intermediate percentages.
+convertRouter.get("/progress/:id", (req, res) => {
+  const id = req.params.id;
+  if (!PROGRESS_ID.test(id)) {
+    res.status(400).json({ error: "Invalid progress id" });
+    return;
+  }
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  // Tell common reverse proxies not to buffer the stream.
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+  res.write(": connected\n\n");
+
+  const unsubscribe = subscribeProgress(id, (percent) => {
+    res.write(`data: ${JSON.stringify({ progress: percent })}\n\n`);
+  });
+  // Heartbeat so an idle conversion (no progress events yet) is not dropped by
+  // proxies that close quiet connections.
+  const heartbeat = setInterval(() => res.write(": ping\n\n"), 15_000);
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+    res.end();
+  });
+});
 
 // Actual file conversion via local ffmpeg. Multipart: file + category + sourceFormat + targetFormat + options(JSON string)
 convertRouter.post("/", async (req, res) => {
@@ -79,6 +114,12 @@ convertRouter.post("/", async (req, res) => {
     const validatedOpts = { ...upload.options };
     // Options validation happens in convertFile -> validateOptions
 
+    // Progress fan-out is optional and never trusted: the id is only a routing
+    // key, and the duration hint only divides ffmpeg's own out_time.
+    const progressHeader = req.headers["x-progress-id"];
+    const progressId =
+      typeof progressHeader === "string" && PROGRESS_ID.test(progressHeader) ? progressHeader : "";
+
     const { mime, result } = await convertFile(
       {
         category: upload.category,
@@ -86,7 +127,11 @@ convertRouter.post("/", async (req, res) => {
         ...validatedOpts,
       },
       upload.filePath,
-      { signal: controller.signal }
+      {
+        signal: controller.signal,
+        durationSeconds: upload.durationSeconds,
+        onProgress: progressId ? (percent: number) => publishProgress(progressId, percent) : undefined,
+      }
     );
 
     if (!result) throw new Error("No conversion result produced");

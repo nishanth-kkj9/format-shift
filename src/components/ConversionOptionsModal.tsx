@@ -297,6 +297,73 @@ export const ConversionOptionsModal: React.FC<ConversionOptionsModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Crop (percent of the source image) */}
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <label className="text-xs font-bold text-slate-200 block">Crop (Percent of Image)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(
+                        [
+                          ["cropX", "Left (X %)"],
+                          ["cropY", "Top (Y %)"],
+                          ["cropWidth", "Width %"],
+                          ["cropHeight", "Height %"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <div key={key}>
+                          <span className="text-[11px] text-slate-400 block mb-1 font-semibold">{label}</span>
+                          <input
+                            type="number"
+                            min={key === "cropWidth" || key === "cropHeight" ? 1 : 0}
+                            max={100}
+                            placeholder={key.startsWith("cropX") || key.startsWith("cropY") ? "0" : "100"}
+                            value={imageOpts[key] ?? ""}
+                            onChange={(e) =>
+                              setImageOpts({
+                                ...imageOpts,
+                                [key]: e.target.value ? parseInt(e.target.value) : undefined,
+                              })
+                            }
+                            aria-label={label}
+                            className="w-full px-3 py-1.5 rounded-xl text-xs font-mono border border-white/15 bg-slate-950 text-white"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Leave blank for no crop. Applies before resize and rotation.
+                    </p>
+                  </div>
+
+                  {/* Color adjustments */}
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <label className="text-xs font-bold text-slate-200 block">
+                      Brightness / Contrast / Saturation
+                    </label>
+                    {(
+                      [
+                        ["brightness", "Brightness"],
+                        ["contrast", "Contrast"],
+                        ["saturation", "Saturation"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <div key={key}>
+                        <div className="flex justify-between items-center mb-1 text-xs">
+                          <span className="text-slate-400 font-semibold">{label}</span>
+                          <span className="font-mono font-bold text-indigo-400">{imageOpts[key] ?? 0}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-100"
+                          max="100"
+                          value={imageOpts[key] ?? 0}
+                          onChange={(e) => setImageOpts({ ...imageOpts, [key]: parseInt(e.target.value) })}
+                          className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
+                          aria-label={label}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
                   {/* Transform / Rotate / Flip Tools */}
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
                     <label className="text-xs font-bold text-slate-200 block">Image Transformations</label>

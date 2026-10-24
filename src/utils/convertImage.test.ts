@@ -16,6 +16,7 @@ import type { TargetFormat } from "../types";
 function stubDom() {
   const ctx = {
     fillStyle: "",
+    filter: "none",
     save: vi.fn(),
     restore: vi.fn(),
     translate: vi.fn(),
@@ -145,6 +146,36 @@ describe("convertImage social preset transforms", () => {
     expect(dom.ctx.translate).toHaveBeenCalledWith(540, 540);
     // aspect-fit of a 200x100 image into 1080x1080: scale 5.4, draw 1080x540
     expect(dom.ctx.drawImage).toHaveBeenCalledWith(expect.anything(), -540, -270, 1080, 540);
+  });
+
+  it("crops before transform and applies color adjustments", async () => {
+    const dom = stubDom();
+    const promise = convertImage(
+      {} as File,
+      "png",
+      {
+        ...BASE_IMAGE_OPTIONS,
+        cropWidth: 50,
+        cropHeight: 50,
+        brightness: 20,
+        contrast: -50,
+        saturation: 50,
+      },
+      () => {}
+    );
+
+    dom.reader().result = "data:image/png;base64,AAA=";
+    dom.reader().onload!();
+    dom.image().width = 200;
+    dom.image().height = 100;
+    dom.image().onload!();
+
+    await promise;
+    // Crop draws the middle-left quadrant of a 200x100 source into a temp canvas...
+    expect(dom.ctx.drawImage).toHaveBeenNthCalledWith(1, expect.anything(), 0, 0, 100, 50, 0, 0, 100, 50);
+    // ...whose 100x50 result is then drawn at the usual centered position.
+    expect(dom.ctx.drawImage).toHaveBeenNthCalledWith(2, expect.anything(), -50, -25, 100, 50);
+    expect(dom.ctx.filter).toBe("brightness(1.2) contrast(0.5) saturate(1.5)");
   });
 });
 

@@ -31,6 +31,15 @@ export interface ImageConversionOptions {
   flipHorizontal: boolean;
   flipVertical: boolean;
   socialPreset?: SocialMediaPreset | undefined;
+  // Crop rectangle in percent of the source image (0-100).
+  cropX?: number | undefined;
+  cropY?: number | undefined;
+  cropWidth?: number | undefined;
+  cropHeight?: number | undefined;
+  // -100..100, 0 = unchanged. Percent offsets, not CSS units.
+  brightness?: number | undefined;
+  contrast?: number | undefined;
+  saturation?: number | undefined;
 }
 
 export interface AudioConversionOptions {

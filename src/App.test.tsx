@@ -67,3 +67,19 @@ describe("theme toggle", () => {
     expect(rootDiv()).toHaveClass("bg-slate-100");
   });
 });
+describe("unsupported source formats", () => {
+  it("shows the detection error and offers no Convert action for a PDF", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    render(<App />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const pdf = new File(["%PDF-1.4 fake"], "doc.pdf", { type: "application/pdf" });
+    await user.upload(input, pdf);
+
+    await waitFor(() => expect(screen.getByText("doc.pdf")).toBeInTheDocument());
+    expect(screen.getByText(/PDF files are not supported/i)).toBeInTheDocument();
+    // No per-item Convert button: without targets the old code would have run
+    // the raw PDF bytes through the text pipeline and produced junk.
+    expect(screen.queryByRole("button", { name: /^Convert$/ })).toBeNull();
+  });
+});

@@ -9,7 +9,13 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { spawn, execFile } from "node:child_process";
-import { runFFmpeg, FFmpegTimeoutError, getFFmpegVersion, getFFmpegVersionSync } from "./runner";
+import {
+  runFFmpeg,
+  FFmpegTimeoutError,
+  getFFmpegVersion,
+  getFFmpegVersionSync,
+  sanitizeFfmpegStderr,
+} from "./runner";
 
 const mockSpawn = vi.mocked(spawn);
 
@@ -95,6 +101,17 @@ describe("runFFmpeg child-process failures", () => {
     child.emit("close", 0);
     await expect(pending).resolves.toBeTruthy();
     expect(child.kill).not.toHaveBeenCalled();
+  });
+});
+
+describe("sanitizeFfmpegStderr", () => {
+  it("strips whole temp paths in both POSIX and Windows form", () => {
+    const posix = sanitizeFfmpegStderr("Error opening /tmp/format-shift-abc/in.png: No such file");
+    expect(posix).not.toContain("/tmp/format-shift-abc");
+    const win = sanitizeFfmpegStderr("Error opening C:\\Users\\x\\Temp\\in.png: Invalid data");
+    expect(win).not.toContain("Users\\x");
+    // Relative fragments are not paths we need to redact.
+    expect(sanitizeFfmpegStderr("ratio 16/9 unsupported")).toContain("16/9");
   });
 });
 

@@ -65,6 +65,9 @@ export const FileList: React.FC<FileListProps> = ({
             const isDone = item.status === "completed";
             const isConverting = item.status === "converting";
             const isError = item.status === "error";
+            // Detection failure (unsupported source such as PDF) leaves no
+            // targets: there is nothing to convert, so no Convert action.
+            const isUnsupported = isError && item.availableTargets.length === 0;
             // Social presets pin the output to one fixed format (jpg); the
             // dropdown then offers nothing else to pick.
             const socialPreset = item.category === "image" && item.options.image?.socialPreset;
@@ -242,7 +245,7 @@ export const FileList: React.FC<FileListProps> = ({
                     {/* Primary Action Buttons */}
                     <div className="flex items-center gap-1.5">
                       {/* Convert Button (when idle) */}
-                      {!isDone && !isConverting && (
+                      {!isDone && !isConverting && !isUnsupported && (
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}

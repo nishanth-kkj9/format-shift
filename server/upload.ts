@@ -21,6 +21,8 @@ export interface ParsedUpload {
   options: Record<string, unknown>;
   /** Source format resolved from file magic bytes / mime / filename (may be ""). */
   sourceFormat: string;
+  /** Client-reported input duration in seconds, used only to compute progress. */
+  durationSeconds?: number | undefined;
 }
 
 export class UploadError extends Error {
@@ -310,6 +312,12 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
       // ignore malformed options; the route validates what it uses
     }
 
+    // Duration is only a progress divisor, never an ffmpeg argument, so an
+    // out-of-range/garbage value is dropped instead of failing the upload.
+    const durationRaw = Number(fields.durationSeconds);
+    const durationSeconds =
+      Number.isFinite(durationRaw) && durationRaw > 0 && durationRaw <= 86_400 ? durationRaw : undefined;
+
     return {
       tempDir,
       filePath,
@@ -320,6 +328,7 @@ export async function parseUploadStream(req: IncomingMessage): Promise<ParsedUpl
       targetFormat: fields.targetFormat || "",
       options,
       sourceFormat: resolveSourceFormat(detected, mimetype, originalFilename, category),
+      durationSeconds,
     };
   } catch (err) {
     cleanup(tempDir, filePath);

@@ -65,7 +65,10 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
     ? FORMAT_OPTIONS[category].filter((o) => availableFormats.includes(o.format))
     : FORMAT_OPTIONS[category] || FORMAT_OPTIONS.image;
   const selectedOption = options.find((o) => o.format === value) || options[0];
-  const SelectedIcon = selectedOption.icon;
+  // A source with no convertible targets (e.g. an unsupported format) leaves
+  // options empty; the trigger must still render instead of crashing the row.
+  const SelectedIcon = selectedOption?.icon ?? Image;
+  const isDisabled = disabled || options.length === 0;
   const activeOption = isOpen && activeIndex >= 0 ? options[activeIndex] : undefined;
 
   const openMenu = (initialIndex: number) => {
@@ -80,7 +83,7 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
   };
 
   const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return;
+    if (isDisabled) return;
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -187,7 +190,7 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
       <button
         ref={triggerRef}
         type="button"
-        disabled={disabled}
+        disabled={isDisabled}
         onClick={() => (isOpen ? closeMenu() : openMenu(0))}
         onKeyDown={handleTriggerKeyDown}
         onBlur={(e) => {
@@ -219,7 +222,7 @@ export const FormatDropdown: React.FC<FormatDropdownProps> = ({
         </div>
         <span className="uppercase tracking-wider font-extrabold">{value}</span>
         <span className="hidden sm:inline text-[10px] text-slate-400 font-medium font-mono">
-          .{selectedOption.format}
+          .{selectedOption?.format ?? value}
         </span>
         <ChevronDown
           className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180 text-indigo-400" : "group-hover:text-white"}`}

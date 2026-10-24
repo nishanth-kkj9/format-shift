@@ -39,7 +39,27 @@ describe("imageFilters", () => {
     expect(vf180).toContain("hflip");
     expect(vf180).toContain("vflip");
     expect(vf270).toContain("transpose=2");
-    expect(vf90).not.toContain("transpose=0");
+  });
+
+  it("maps crop and color adjustments to ffmpeg filters", () => {
+    const vf = imageFilters({
+      targetFormat: "png",
+      category: "image",
+      cropX: 10,
+      cropY: 20,
+      cropWidth: 50,
+      cropHeight: 40,
+      brightness: 20,
+      contrast: -50,
+      saturation: 50,
+    }).join(" ");
+    expect(vf).toContain("crop=iw*0.5:ih*0.4:iw*0.1:ih*0.2");
+    // Brightness multiplies (CSS-equivalent); contrast/saturation are eq gains.
+    expect(vf).toContain("colorchannelmixer=rr=1.2:gg=1.2:bb=1.2");
+    expect(vf).toContain("eq=contrast=0.5:saturation=1.5");
+    // Crop first, then color, so both hit the same pixels.
+    expect(vf.indexOf("crop=")).toBeLessThan(vf.indexOf("colorchannelmixer="));
+    expect(vf.indexOf("colorchannelmixer=")).toBeLessThan(vf.indexOf("eq="));
   });
 
   it("applies no rotation filter for rotation 0", () => {

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   parseFfmpegVersion,
+  parseProgressMicroseconds,
   isFfmpegAtLeast,
   getFFmpegVersion,
   FFMPEG_MIN_FEATURE_VERSION,
@@ -30,6 +31,20 @@ describe("parseFfmpegVersion", () => {
   it("returns null for unparseable output", () => {
     expect(parseFfmpegVersion("ffmpeg not found")).toBeNull();
     expect(parseFfmpegVersion("")).toBeNull();
+  });
+});
+
+describe("parseProgressMicroseconds", () => {
+  it("reads out_time_us and legacy out_time_ms as microseconds", () => {
+    expect(parseProgressMicroseconds("out_time_us=1500000")).toBe(1_500_000);
+    expect(parseProgressMicroseconds("out_time_ms=2500000")).toBe(2_500_000);
+    expect(parseProgressMicroseconds("out_time_us=0")).toBe(0);
+  });
+
+  it("ignores non-progress and N/A lines", () => {
+    expect(parseProgressMicroseconds("out_time_us=N/A")).toBeNull();
+    expect(parseProgressMicroseconds("frame=42")).toBeNull();
+    expect(parseProgressMicroseconds("")).toBeNull();
   });
 });
 

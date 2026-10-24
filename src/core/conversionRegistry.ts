@@ -309,4 +309,11 @@ export const SERVER_OPTION_KEYS: readonly string[] = [
   "resolution",
   "fps",
   "muteAudio",
+  "cropX",
+  "cropY",
+  "cropWidth",
+  "cropHeight",
+  "brightness",
+  "contrast",
+  "saturation",
 ];

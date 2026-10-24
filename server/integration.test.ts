@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { app } from "./app";
+import { app, isPrivateDistAsset } from "./app";
 import type { Server } from "node:http";
 import { readdirSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -846,5 +846,12 @@ describe("Code template endpoint (honest snippets)", () => {
     // arrive. A hidden field alone is too late (multipart arrives after headers).
     expect(data.code.html).toContain('action="/api/convert?category=image"');
     expect(data.code.html).not.toContain('action="/api/convert"');
+  });
+
+  it("never serves the server bundle or its source map from dist", () => {
+    expect(isPrivateDistAsset("/server.cjs")).toBe(true);
+    expect(isPrivateDistAsset("/server.cjs.map")).toBe(true);
+    expect(isPrivateDistAsset("/assets/index-abc.js")).toBe(false);
+    expect(isPrivateDistAsset("/index.html")).toBe(false);
   });
 });
